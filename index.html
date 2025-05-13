@@ -1,0 +1,63 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Recipe viewer (ES-module edition)</title>
+<style>
+  body      { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 2rem; }
+  input     { margin-bottom: 1.5rem; }
+  article   { max-width: 48rem; }
+  h1        { margin-top: 0; line-height: 1.2; }
+  img       { max-width: 100%; height: auto; display: block; margin: 1rem 0; }
+</style>
+
+<input type="file" id="pick" accept=".md">
+<article id="out"></article>
+
+<script type="module">
+  /* ---- ES-module imports (no globals) ------------------------------- */
+  import matter      from 'https://cdn.jsdelivr.net/npm/gray-matter@4.0.3/+esm';
+  import markdownIt  from 'https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/+esm';
+  import DOMPurify   from 'https://cdn.jsdelivr.net/npm/dompurify@3.2.5/+esm';
+
+  /* ---- Configure Markdown-it --------------------------------------- */
+  const md = markdownIt({
+    html:        true,   // allow raw HTML in markdown
+    linkify:     true,   // autolink URLs
+    typographer: true    // nice quotes / dashes
+  });
+
+  /* ---- File-picker logic ------------------------------------------- */
+  const picker  = document.getElementById('pick');
+  const output  = document.getElementById('out');
+
+  picker.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    /* 1. read file text */
+    const text = await file.text();
+
+    /* 2. split front-matter (data) & body (content) */
+    const { data: fm, content } = matter(text);
+
+    /* 3. render markdown → HTML and sanitize */
+    let html = md.render(content);
+    html     = DOMPurify.sanitize(html);
+
+    /* 4. inject into page (use front-matter fields where you like) */
+    output.innerHTML = `
+      <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
+      ${Array.isArray(fm.ingredients) ? `
+    <h2>What you'll need</h2>
+    <ul>
+      ${fm.ingredients
+        .map(line => `<li>${DOMPurify.sanitize(line)}</li>`)
+        .join('')}
+    </ul>
+  ` : ''}
+      ${fm.image   ? `<img src="${fm.image}" alt="">` : ''}
+      ${fm.servings? `<p><em>Servings: ${fm.servings}</em></p>` : ''}
+      <h2>What to do</h2>
+      ${html}
+    `;
+  });
+</script>
