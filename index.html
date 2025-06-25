@@ -208,9 +208,27 @@
   pickBtn.addEventListener('click', async () => {
     dirHandle = await pickRecipeFolder();
     if (dirHandle) {
-      // Only save if we got a real directory handle (not array of files)
+      // Save both directory handles and file arrays
       if (dirHandle.kind === 'directory') {
-        await set('recipeDirHandle', dirHandle);   // remember for next load
+        // Modern browsers: save directory handle
+        await set('recipeDirHandle', dirHandle);
+      } else if (Array.isArray(dirHandle)) {
+        // Fallback browsers: Store recipe content in IndexedDB for persistence
+        console.log('Storing recipe files in IndexedDB for persistence...');
+        const recipes = [];
+        for (const file of dirHandle) {
+          if (file.name.endsWith('.md')) {
+            const content = await file.text();
+            recipes.push({
+              name: file.name,
+              content: content,
+              lastModified: file.lastModified,
+              size: file.size
+            });
+          }
+        }
+        await set('recipeData', recipes);
+        console.log(`Stored ${recipes.length} recipes in IndexedDB`);
       }
       await renderIndex();
       indexUl.classList.remove('hidden');
@@ -219,16 +237,35 @@
   });
   (async () => {
     try {
+      // Try to restore directory handle first (modern browsers)
       const saved = await get('recipeDirHandle');
-      console.log(saved);
       if (saved && await verifyPermission(saved, 'read')) {
         dirHandle = saved;
         await renderIndex();
         indexUl.classList.remove('hidden');
         route();
+        return;
       }
-    } catch {
-      console.log('Error after verifying permissions');
+    } catch (err) {
+      console.log('Error restoring directory handle:', err);
+    }
+    
+    try {
+      // Fallback: try to restore recipe data (Android/fallback browsers)
+      const recipeData = await get('recipeData');
+      if (recipeData && recipeData.length > 0) {
+        console.log(`Restored ${recipeData.length} recipes from IndexedDB`);
+        // Create mock File objects from stored data
+        dirHandle = recipeData.map(recipe => new File([recipe.content], recipe.name, {
+          type: 'text/markdown',
+          lastModified: recipe.lastModified
+        }));
+        await renderIndex();
+        indexUl.classList.remove('hidden');
+        route();
+      }
+    } catch (err) {
+      console.log('Error restoring recipe data:', err);
     }
   })();
 
@@ -263,8 +300,23 @@
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
-    installBanner.classList.remove('hidden');
+    // Only show banner if not already running as installed PWA
+    if (!isRunningStandalone()) {
+      installBanner.classList.remove('hidden');
+    }
   });
+  
+  // Check if app is running in standalone mode (installed PWA)
+  function isRunningStandalone() {
+    return window.matchMedia('(display-mode: standalone)').matches ||
+           window.navigator.standalone === true ||
+           document.referrer.includes('android-app://');
+  }
+  
+  // Hide banner if already running as PWA
+  if (isRunningStandalone()) {
+    installBanner.classList.add('hidden');
+  }
   
   installBtn.addEventListener('click', async () => {
     if (!deferredPrompt) return;
