@@ -102,7 +102,7 @@
   import matter from 'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm';
   import markdownIt from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
   import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3/+esm';
-  import { get, set } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
+  import { get, set, clear } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
   /* Init markdown-it  */
   const md = markdownIt({
@@ -351,12 +351,14 @@
     if (debugDiv) {
       debugDiv.innerHTML = `
         <strong>PWA Debug Info:</strong><br>
+        Current URL: ${window.location.href}<br>
         Standalone: ${isStandalone}<br>
         Was Installed: ${wasInstalled}<br>
         Display Mode: ${window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser'}<br>
         Navigator Standalone: ${window.navigator.standalone}<br>
         Referrer: ${document.referrer}<br>
-        User Agent: ${navigator.userAgent.substring(0, 50)}...
+        User Agent: ${navigator.userAgent.substring(0, 50)}...<br>
+        <button onclick="clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
       `;
       debugDiv.style.display = 'block';
       
@@ -403,6 +405,30 @@
     // Remember that the app was installed
     await set('appInstalled', true);
   });
+
+  // Function to clear cache and reload (for debugging)
+  window.clearCacheAndReload = async () => {
+    try {
+      // Clear service worker caches
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+      
+      // Clear IndexedDB data
+      await clear();
+      
+      // Unregister service worker
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(reg => reg.unregister()));
+      }
+      
+      // Force reload
+      window.location.reload(true);
+    } catch (err) {
+      console.error('Error clearing cache:', err);
+      window.location.reload(true);
+    }
+  };
 </script>
 </body>
 </html>
