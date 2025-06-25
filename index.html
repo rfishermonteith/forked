@@ -1,63 +1,265 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<title>Recipe viewer (ES-module edition)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A local-first recipe management app">
+<meta name="theme-color" content="#2c3e50">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Recipe Box</title>
 <style>
-  body      { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 2rem; }
-  input     { margin-bottom: 1.5rem; }
-  article   { max-width: 48rem; }
-  h1        { margin-top: 0; line-height: 1.2; }
-  img       { max-width: 100%; height: auto; display: block; margin: 1rem 0; }
+  body {
+    font: 16px/1.5 system-ui, sans-serif;
+    margin: 0;
+    padding: 0 2rem;
+  }
+  header {
+    margin: 2rem 0 1rem;
+  }
+  ul {
+    list-style: none;
+    padding-left: 0;
+  }
+  li {
+    margin: .25rem 0;
+  }
+  a {
+    text-decoration: none;
+    color: #0366d6;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  h1 {
+    margin: 0 0 1rem;
+    font-size: 1.8rem;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1rem 0;
+  }
+  .pick {
+    margin: 1.5rem 0;
+  }
+  .hidden {
+    display: none;
+  }
+  .install-banner {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem 2rem;
+    margin: 0 -2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .install-banner button {
+    background: white;
+    color: #2c3e50;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .install-banner button:hover {
+    opacity: 0.9;
+  }
 </style>
+</head>
+<body>
+<div id="install-banner" class="install-banner hidden">
+  <span>Install Recipe Box for easy access</span>
+  <button id="install-btn">Install</button>
+</div>
+<header>
+  <button class="pick" id="pickDir">Open recipe folder</button>
+  <ul id="index"></ul>
+</header>
 
-<input type="file" id="pick" accept=".md">
-<article id="out"></article>
+<article id="viewer"></article>
 
 <script type="module">
-  /* ---- ES-module imports (no globals) ------------------------------- */
-  import matter      from 'https://cdn.jsdelivr.net/npm/gray-matter@4.0.3/+esm';
-  import markdownIt  from 'https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/+esm';
-  import DOMPurify   from 'https://cdn.jsdelivr.net/npm/dompurify@3.2.5/+esm';
+  import matter from 'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm';
+  import markdownIt from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
+  import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3/+esm';
+  import { get, set } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
-  /* ---- Configure Markdown-it --------------------------------------- */
+  /* Init markdown-it  */
   const md = markdownIt({
-    html:        true,   // allow raw HTML in markdown
-    linkify:     true,   // autolink URLs
-    typographer: true    // nice quotes / dashes
+    html: true,
+    linkify: true,
+    typographer: true
   });
 
-  /* ---- File-picker logic ------------------------------------------- */
-  const picker  = document.getElementById('pick');
-  const output  = document.getElementById('out');
+  // Global state
+  let dirHandle = null;
+  const slugToFile = new Map();
 
-  picker.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // UI references
+  const pickBtn = document.getElementById('pickDir');
+  const indexUl = document.getElementById('index');
+  const viewer = document.getElementById('viewer');
 
-    /* 1. read file text */
+  // Helper functions
+  const slugify = (s) =>
+    s.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const renderIndex = async () => {
+    indexUl.innerHTML = '';
+    slugToFile.clear();
+    for await (const entry of dirHandle.values()) {
+      if (entry.kind ? entry.kind === 'file'
+        : entry instanceof File && entry.name.endsWith('.md')) {
+        const slug = slugify(entry.name.replace(/\.md$/, ''));
+        slugToFile.set(slug, entry);
+        const li = document.createElement('li');
+        li.innerHTML = `<a href="#recipe=${slug}">${entry.name.replace(/\.md$/, '')}</a>`;
+        indexUl.appendChild(li);
+      }
+    }
+  };
+
+  const renderRecipe = async (slug) => {
+    const entry = slugToFile.get(slug);
+    if (!entry) {
+      viewer.textContent = 'Recipe not found.';
+      return;
+    }
+
+    const file = entry.getFile ? await entry.getFile() : entry;
     const text = await file.text();
-
-    /* 2. split front-matter (data) & body (content) */
     const { data: fm, content } = matter(text);
 
-    /* 3. render markdown → HTML and sanitize */
     let html = md.render(content);
-    html     = DOMPurify.sanitize(html);
+    html = DOMPurify.sanitize(html);
 
-    /* 4. inject into page (use front-matter fields where you like) */
-    output.innerHTML = `
-      <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
-      ${Array.isArray(fm.ingredients) ? `
-    <h2>What you'll need</h2>
-    <ul>
-      ${fm.ingredients
-        .map(line => `<li>${DOMPurify.sanitize(line)}</li>`)
-        .join('')}
-    </ul>
-  ` : ''}
-      ${fm.image   ? `<img src="${fm.image}" alt="">` : ''}
-      ${fm.servings? `<p><em>Servings: ${fm.servings}</em></p>` : ''}
-      <h2>What to do</h2>
-      ${html}
-    `;
+    // Inject into DOM
+    viewer.innerHTML = `
+    <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
+    ${fm.image ? `<img src="${fm.image}" alt="">` : ''}
+    ${Array.isArray(fm.ingredients) ? `
+      <h2>What you'll need</h2>
+      <ul>${fm.ingredients.map(i => `<li>${DOMPurify.sanitize(i)}</li>`).join('')}</ul>` : ''}
+    <h2>What to do</h2>
+    ${html}
+  `;
+  };
+
+  async function verifyPermission(handle, mode = 'read') {
+    const opts = { mode };
+    // Was permission already granted?
+    console.log(await handle.queryPermission(opts))
+    if ((await handle.queryPermission(opts)) === 'granted') return true;
+    // If not, ask (only once per session)
+    return (await handle.requestPermission(opts)) === 'granted';
+  }
+
+
+  // Routing: react to hash
+  const route = () => {
+    const match = location.hash.match(/recipe=([\w-]+)/);
+    if (match && dirHandle) renderRecipe(match[1]);
+  };
+  window.addEventListener('hashchange', route);
+
+  async function pickRecipeFolder() {
+    if ('showDirectoryPicker' in window) {
+      // Modern Chromium path (read + write)
+      return await window.showDirectoryPicker();
+    }
+
+    // Fallback: let user pick a whole folder read-only (WebKit proprietary)
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.webkitdirectory = true;
+      input.multiple = true;
+      input.addEventListener('change', () => {
+        resolve(Array.from(input.files));
+      });
+      input.click();
+    });
+  }
+
+  // Auto-restore directory permission on reload
+  pickBtn.addEventListener('click', async () => {
+    dirHandle = await window.showDirectoryPicker();
+    await set('recipeDirHandle', dirHandle);   // remember for next load
+    await renderIndex();
+    indexUl.classList.remove('hidden');
+    route();
+  });
+  (async () => {
+    try {
+      const saved = await get('recipeDirHandle');
+      console.log(saved);
+      if (saved && await verifyPermission(saved, 'read')) {
+        dirHandle = saved;
+        await renderIndex();
+        indexUl.classList.remove('hidden');
+        route();
+      }
+    } catch {
+      console.log('Error after verifying permissions');
+    }
+  })();
+
+  // PWA Service Worker Registration
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/forked/sw.js');
+        console.log('ServiceWorker registration successful:', registration.scope);
+        
+        // Handle updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New service worker available
+              console.log('New content available; refresh to update.');
+            }
+          });
+        });
+      } catch (err) {
+        console.log('ServiceWorker registration failed:', err);
+      }
+    });
+  }
+
+  // PWA Install prompt
+  let deferredPrompt;
+  const installBanner = document.getElementById('install-banner');
+  const installBtn = document.getElementById('install-btn');
+  
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBanner.classList.remove('hidden');
+  });
+  
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to install prompt: ${outcome}`);
+    deferredPrompt = null;
+    installBanner.classList.add('hidden');
+  });
+  
+  // Hide banner if already installed
+  window.addEventListener('appinstalled', () => {
+    console.log('Recipe Box app installed');
+    installBanner.classList.add('hidden');
   });
 </script>
+</body>
+</html>

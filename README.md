@@ -24,3 +24,56 @@ Some nice-to-haves:
 - [ ] Implement recipe printing and sharing
 - [ ] Implement editor for recipes (WYSIWYG if possible)
 - [ ] Implement OCR and text import of recipes (likely via LLM)
+
+## Testing on Mobile (Termux/Android)
+
+### Quick Start
+
+1. **Install Termux** from F-Droid (not Play Store)
+   
+2. **Clone and test**:
+   ```bash
+   # Install git if needed
+   pkg install git
+   
+   # Clone your branch
+   git clone -b pwa-implementation https://github.com/yourusername/forked.git
+   cd forked
+   
+   # Run test server
+   bash test-mobile.sh
+   ```
+
+3. **Open in Chrome/Firefox**:
+   - Visit `http://localhost:8080`
+   - Look for install prompt or use browser menu → "Install app"
+
+### Testing Checklist
+
+#### PWA Installation
+- [ ] Install banner appears (if not already installed)
+- [ ] App installs successfully
+- [ ] App icon appears on home screen
+- [ ] App opens in standalone mode (no browser UI)
+
+#### Offline Functionality
+- [ ] Load the app online first
+- [ ] Enable airplane mode
+- [ ] App still loads and shows cached content
+- [ ] Navigation between recipes works offline
+
+#### Mobile-Specific
+- [ ] Touch targets are large enough
+- [ ] No horizontal scrolling
+- [ ] Keyboard doesn't cover input fields
+- [ ] Back button works as expected
+
+### Debugging Tips
+
+**View Service Worker status:**
+- In Chrome: `chrome://inspect/#service-workers`
+- Connect via USB debugging to see mobile Chrome
+
+**Common Issues:**
+- **"Install" not appearing:** Visit site twice, wait 30 seconds between visits
+- **Service Worker not registering:** Check console, ensure HTTPS/localhost, clear browser data

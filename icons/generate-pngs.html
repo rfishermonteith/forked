@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate PNG Icons</title>
+</head>
+<body>
+    <h1>Generate PNG Icons from SVG</h1>
+    <p>Open this file locally, then click the buttons to download the PNG icons.</p>
+    
+    <div id="svg-container"></div>
+    
+    <canvas id="canvas192" width="192" height="192" style="border: 1px solid #ccc;"></canvas>
+    <button onclick="download('canvas192', 'icon-192.png')">Download 192x192</button>
+    <br><br>
+    
+    <canvas id="canvas512" width="512" height="512" style="border: 1px solid #ccc; max-width: 256px;"></canvas>
+    <button onclick="download('canvas512', 'icon-512.png')">Download 512x512</button>
+    
+    <script>
+        const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="51" fill="#2c3e50"/>
+  
+  <!-- White circle -->
+  <circle cx="256" cy="256" r="180" fill="#ffffff"/>
+  
+  <!-- Recipe book -->
+  <g transform="translate(256, 256)">
+    <!-- Book pages -->
+    <rect x="-80" y="-100" width="160" height="200" fill="#ecf0f1"/>
+    <!-- Book spine -->
+    <rect x="-80" y="-100" width="30" height="200" fill="#34495e"/>
+    
+    <!-- Fork and spoon -->
+    <g stroke="#2c3e50" stroke-width="8" stroke-linecap="round" fill="none">
+      <!-- Fork -->
+      <path d="M 10,-70 L 10,-40 L 10,60"/>
+      <path d="M 25,-70 L 25,-40"/>
+      <path d="M 40,-70 L 40,-40 L 40,60"/>
+      <path d="M 10,60 L 40,60"/>
+      
+      <!-- Spoon -->
+      <ellipse cx="-20" cy="-55" rx="15" ry="25"/>
+      <path d="M -20,-30 L -20,60"/>
+    </g>
+  </g>
+</svg>`;
+        
+        function renderSvgToCanvas(canvasId, size) {
+            const canvas = document.getElementById(canvasId);
+            const ctx = canvas.getContext('2d');
+            
+            const img = new Image();
+            const svgBlob = new Blob([svgString], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(svgBlob);
+            
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0, size, size);
+                URL.revokeObjectURL(url);
+            };
+            
+            img.src = url;
+        }
+        
+        function download(canvasId, filename) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = filename;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+        
+        // Render icons on load
+        window.onload = function() {
+            document.getElementById('svg-container').innerHTML = svgString;
+            renderSvgToCanvas('canvas192', 192);
+            renderSvgToCanvas('canvas512', 512);
+        };
+    </script>
+</body>
+</html>
