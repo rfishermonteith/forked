@@ -308,15 +308,40 @@
   
   // Check if app is running in standalone mode (installed PWA)
   function isRunningStandalone() {
-    return window.matchMedia('(display-mode: standalone)').matches ||
-           window.navigator.standalone === true ||
-           document.referrer.includes('android-app://');
+    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                      window.navigator.standalone === true ||
+                      document.referrer.includes('android-app://') ||
+                      window.matchMedia('(display-mode: fullscreen)').matches ||
+                      window.matchMedia('(display-mode: minimal-ui)').matches;
+    
+    console.log('PWA Standalone Detection:', {
+      'display-mode: standalone': window.matchMedia('(display-mode: standalone)').matches,
+      'navigator.standalone': window.navigator.standalone,
+      'referrer': document.referrer,
+      'display-mode: fullscreen': window.matchMedia('(display-mode: fullscreen)').matches,
+      'display-mode: minimal-ui': window.matchMedia('(display-mode: minimal-ui)').matches,
+      'final result': standalone
+    });
+    
+    return standalone;
   }
   
   // Hide banner if already running as PWA
-  if (isRunningStandalone()) {
-    installBanner.classList.add('hidden');
+  async function checkAndHideBanner() {
+    // Check if previously installed
+    const wasInstalled = await get('appInstalled');
+    
+    if (isRunningStandalone() || wasInstalled) {
+      console.log('Running as PWA or previously installed - hiding install banner');
+      installBanner.classList.add('hidden');
+    } else {
+      console.log('Running in browser - install banner may be shown');
+    }
   }
+  
+  // Check immediately and after DOM load
+  checkAndHideBanner();
+  document.addEventListener('DOMContentLoaded', checkAndHideBanner);
   
   installBtn.addEventListener('click', async () => {
     if (!deferredPrompt) return;
@@ -328,9 +353,11 @@
   });
   
   // Hide banner if already installed
-  window.addEventListener('appinstalled', () => {
+  window.addEventListener('appinstalled', async () => {
     console.log('Recipe Box app installed');
     installBanner.classList.add('hidden');
+    // Remember that the app was installed
+    await set('appInstalled', true);
   });
 </script>
 </body>
