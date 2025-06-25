@@ -45,7 +45,7 @@ Some nice-to-haves:
    ```
 
 3. **Open in Chrome/Firefox**:
-   - Visit `http://localhost:8080`
+   - Visit `http://localhost:8080/forked/` (root redirects here automatically)
    - Look for install prompt or use browser menu → "Install app"
 
 ### Testing Checklist
