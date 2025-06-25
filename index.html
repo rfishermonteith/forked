@@ -115,14 +115,29 @@
   const renderIndex = async () => {
     indexUl.innerHTML = '';
     slugToFile.clear();
-    for await (const entry of dirHandle.values()) {
-      if (entry.kind ? entry.kind === 'file'
-        : entry instanceof File && entry.name.endsWith('.md')) {
-        const slug = slugify(entry.name.replace(/\.md$/, ''));
-        slugToFile.set(slug, entry);
-        const li = document.createElement('li');
-        li.innerHTML = `<a href="#recipe=${slug}">${entry.name.replace(/\.md$/, '')}</a>`;
-        indexUl.appendChild(li);
+    
+    // Handle both directory handles and file arrays
+    if (Array.isArray(dirHandle)) {
+      // Fallback mode: array of files
+      for (const file of dirHandle) {
+        if (file.name.endsWith('.md')) {
+          const slug = slugify(file.name.replace(/\.md$/, ''));
+          slugToFile.set(slug, file);
+          const li = document.createElement('li');
+          li.innerHTML = `<a href="#recipe=${slug}">${file.name.replace(/\.md$/, '')}</a>`;
+          indexUl.appendChild(li);
+        }
+      }
+    } else {
+      // Modern mode: directory handle
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file' && entry.name.endsWith('.md')) {
+          const slug = slugify(entry.name.replace(/\.md$/, ''));
+          slugToFile.set(slug, entry);
+          const li = document.createElement('li');
+          li.innerHTML = `<a href="#recipe=${slug}">${entry.name.replace(/\.md$/, '')}</a>`;
+          indexUl.appendChild(li);
+        }
       }
     }
   };
@@ -134,7 +149,7 @@
       return;
     }
 
-    const file = entry.getFile ? await entry.getFile() : entry;
+    const file = entry.getFile ? await entry.getFile() : entry;  // Works for both FileSystemFileHandle and File
     const text = await file.text();
     const { data: fm, content } = matter(text);
 
@@ -191,11 +206,16 @@
 
   // Auto-restore directory permission on reload
   pickBtn.addEventListener('click', async () => {
-    dirHandle = await window.showDirectoryPicker();
-    await set('recipeDirHandle', dirHandle);   // remember for next load
-    await renderIndex();
-    indexUl.classList.remove('hidden');
-    route();
+    dirHandle = await pickRecipeFolder();
+    if (dirHandle) {
+      // Only save if we got a real directory handle (not array of files)
+      if (dirHandle.kind === 'directory') {
+        await set('recipeDirHandle', dirHandle);   // remember for next load
+      }
+      await renderIndex();
+      indexUl.classList.remove('hidden');
+      route();
+    }
   });
   (async () => {
     try {

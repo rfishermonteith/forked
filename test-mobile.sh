@@ -25,10 +25,19 @@ cat > server.py << 'EOF'
 import http.server
 import socketserver
 import os
+import urllib.parse
 
 PORT = 8080
 
 class PWAHandler(http.server.SimpleHTTPRequestHandler):
+    def translate_path(self, path):
+        # Remove /forked prefix if present
+        if path.startswith('/forked/'):
+            path = path[7:]  # Remove '/forked'
+        elif path == '/forked':
+            path = '/'
+        return super().translate_path(path)
+    
     def end_headers(self):
         self.send_header('Service-Worker-Allowed', '/')
         self.send_header('Cache-Control', 'no-cache')
@@ -39,7 +48,8 @@ class PWAHandler(http.server.SimpleHTTPRequestHandler):
         print(f"{self.address_string()} - {format%args}")
 
 print(f"\n🚀 Server starting on port {PORT}...")
-print(f"📱 Access on this device: http://localhost:{PORT}")
+print(f"📱 Access on this device: http://localhost:{PORT}/forked/")
+print(f"   Note: The app is served at /forked/ to match GitHub Pages")
 
 with socketserver.TCPServer(("", PORT), PWAHandler) as httpd:
     httpd.serve_forever()
@@ -47,9 +57,9 @@ EOF
 
 echo ""
 echo "🌐 Access URLs:"
-echo "  - On this device: http://localhost:$PORT"
+echo "  - On this device: http://localhost:$PORT/forked/"
 if [ ! -z "$LOCAL_IP" ]; then
-    echo "  - On same WiFi:  http://$LOCAL_IP:$PORT"
+    echo "  - On same WiFi:  http://$LOCAL_IP:$PORT/forked/"
 fi
 echo ""
 echo "📝 PWA Testing Tips:"
