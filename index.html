@@ -70,6 +70,18 @@
   .install-banner button:hover {
     opacity: 0.9;
   }
+  .debug-info {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    max-width: 300px;
+    z-index: 1000;
+  }
 </style>
 </head>
 <body>
@@ -83,6 +95,8 @@
 </header>
 
 <article id="viewer"></article>
+
+<div id="debug-info" class="debug-info" style="display: none;"></div>
 
 <script type="module">
   import matter from 'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm';
@@ -330,8 +344,25 @@
   async function checkAndHideBanner() {
     // Check if previously installed
     const wasInstalled = await get('appInstalled');
+    const isStandalone = isRunningStandalone();
     
-    if (isRunningStandalone() || wasInstalled) {
+    // Show debug info on screen
+    const debugDiv = document.getElementById('debug-info');
+    debugDiv.innerHTML = `
+      <strong>PWA Debug Info:</strong><br>
+      Standalone: ${isStandalone}<br>
+      Was Installed: ${wasInstalled}<br>
+      Display Mode: ${window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser'}<br>
+      Navigator Standalone: ${window.navigator.standalone}<br>
+      Referrer: ${document.referrer}<br>
+      User Agent: ${navigator.userAgent.substring(0, 50)}...
+    `;
+    debugDiv.style.display = 'block';
+    
+    // Hide debug after 10 seconds
+    setTimeout(() => debugDiv.style.display = 'none', 10000);
+    
+    if (isStandalone || wasInstalled) {
       console.log('Running as PWA or previously installed - hiding install banner');
       installBanner.classList.add('hidden');
     } else {
