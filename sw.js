@@ -1,15 +1,17 @@
-const CACHE_NAME = 'recipe-app-v1';
+const VERSION = '0.0.1';
+const CACHE_NAME = `recipe-app-v${VERSION}`;
 const urlsToCache = [
   '/forked/',
   '/forked/index.html',
   '/forked/manifest.json',
   '/forked/icons/icon-192.png',
   '/forked/icons/icon-512.png',
-  // External dependencies
-  'https://unpkg.com/gray-matter@4.0.3/dist/gray-matter.js',
-  'https://unpkg.com/markdown-it@13.0.2/dist/markdown-it.min.js',
-  'https://unpkg.com/dompurify@3.0.8/dist/purify.min.js',
-  'https://unpkg.com/idb-keyval@6.2.1/dist/umd.js'
+  '/forked/sw.js',
+  // External dependencies - using CDN URLs from index.html
+  'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm',
+  'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm',
+  'https://cdn.jsdelivr.net/npm/dompurify@3/+esm',
+  'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm'
 ];
 
 // Install event - cache files
@@ -18,7 +20,14 @@ self.addEventListener('install', event => {
     caches.open(CACHE_NAME)
       .then(cache => {
         console.log('Opened cache');
-        return cache.addAll(urlsToCache);
+        // Cache files individually to handle failures gracefully
+        return Promise.all(
+          urlsToCache.map(url => {
+            return cache.add(url).catch(err => {
+              console.warn('Failed to cache:', url, err);
+            });
+          })
+        );
       })
       .then(() => self.skipWaiting())
   );
@@ -58,7 +67,7 @@ self.addEventListener('fetch', event => {
 
         return fetch(fetchRequest).then(response => {
           // Check if valid response
-          if (!response || response.status !== 200 || response.type === 'opaque') {
+          if (!response || response.status !== 200) {
             return response;
           }
 
@@ -77,11 +86,18 @@ self.addEventListener('fetch', event => {
           }
 
           return response;
-        }).catch(() => {
+        }).catch(error => {
           // Offline fallback
-          if (event.request.destination === 'document') {
-            return caches.match('/forked/index.html');
+          console.log('Fetch failed, serving offline fallback:', error);
+          
+          // For navigation requests, return the cached index.html
+          if (event.request.mode === 'navigate') {
+            return caches.match('/forked/index.html') || caches.match('/forked/');
           }
+          
+          // For other requests, try to find something in cache
+          return caches.match(event.request.url) || 
+                 caches.match(event.request.url.replace(/\/$/, '/index.html'));
         });
       })
   );
