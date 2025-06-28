@@ -105,7 +105,7 @@ Follow these steps to enable Google Drive sync for multi-device access.
    - User support email: your email
    - Developer contact: your email
    - Click "Save and Continue"
-   - Scopes: Add `../auth/drive.file` 
+   - Scopes: Add `../auth/drive` (allows access to manually added files)
    - Test users: Add your email and partner's email
    - Click "Save and Continue"
 
