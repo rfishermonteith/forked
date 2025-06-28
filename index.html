@@ -400,15 +400,29 @@
       return;
     }
     
+    console.log('Starting manual sync...');
     syncProgress.classList.remove('hidden');
     syncNowBtn.disabled = true;
     
+    // Debug: Check what we can see in the cloud before syncing
+    try {
+      const cloudRecipes = await syncManager.provider.listRecipes();
+      console.log('Cloud recipes before sync:', cloudRecipes);
+      const localRecipes = await get('recipeData') || [];
+      console.log('Local recipes before sync:', localRecipes);
+    } catch (error) {
+      console.error('Error listing recipes:', error);
+    }
+    
     const result = await syncManager.sync((progress) => {
+      console.log('Sync progress:', progress);
       syncProgressText.textContent = `${progress.status}: ${progress.progress}%`;
       if (progress.current) {
         syncProgressText.textContent += ` - ${progress.current}`;
       }
     });
+    
+    console.log('Sync result:', result);
     
     if (result.success) {
       syncProgressText.textContent = `Sync complete! Uploaded: ${result.uploaded}, Downloaded: ${result.downloaded}`;
@@ -519,11 +533,18 @@
 
   // Initialize sync functionality
   (async () => {
-    await initializeSync();
-    // After sync is initialized, try to load synced recipes
-    await renderIndex();
-    indexUl.classList.remove('hidden');
-    route();
+    try {
+      console.log('Starting sync initialization...');
+      await initializeSync();
+      console.log('Sync initialization complete');
+      // After sync is initialized, try to load synced recipes
+      await renderIndex();
+      indexUl.classList.remove('hidden');
+      route();
+      console.log('DebugSync should now be available');
+    } catch (error) {
+      console.error('Error during sync initialization:', error);
+    }
   })();
 
   // PWA Service Worker Registration
