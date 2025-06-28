@@ -184,6 +184,30 @@
   // Sync manager
   const syncManager = new SyncManager();
   let syncEnabled = false;
+  
+  // Expose sync manager for debugging
+  window.debugSync = {
+    manager: syncManager,
+    async listCloudRecipes() {
+      if (!syncManager.provider) {
+        console.log('Sync not initialized');
+        return [];
+      }
+      const recipes = await syncManager.provider.listRecipes();
+      console.log('Cloud recipes found:', recipes);
+      return recipes;
+    },
+    async listLocalRecipes() {
+      const recipes = await get('recipeData') || [];
+      console.log('Local recipes found:', recipes);
+      return recipes;
+    },
+    async testSync() {
+      console.log('Testing sync process...');
+      await this.listLocalRecipes();
+      await this.listCloudRecipes();
+    }
+  };
 
   // UI references
   const pickBtn = document.getElementById('pickDir');
