@@ -5,6 +5,15 @@
 echo "📱 Recipe App Mobile Test Server"
 echo "================================"
 
+# Build configuration from .env file
+if [ -f build-config.sh ]; then
+    ./build-config.sh
+    if [ $? -ne 0 ]; then
+        echo "❌ Configuration build failed"
+        exit 1
+    fi
+fi
+
 # Check if Python is installed
 if ! command -v python &> /dev/null; then
     echo "Python not found. Installing..."

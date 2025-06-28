@@ -120,22 +120,26 @@ Follow these steps to enable Google Drive sync for multi-device access.
 
 5. Copy your Client ID (looks like: `123456789-abcdefg.apps.googleusercontent.com`)
 
-### 4. Update Your Code
+### 4. Configure Environment
 
-1. Edit `sync-test.html` and replace:
-   ```javascript
-   const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
+1. Copy the example environment file:
+   ```bash
+   cp .env.example .env
    ```
-   with your actual Client ID.
 
-2. Do the same in `google-drive-provider.js`:
-   ```javascript
-   this.clientId = config.clientId || 'YOUR_CLIENT_ID_HERE';
+2. Edit `.env` and add your Client ID:
+   ```bash
+   GOOGLE_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
+   ```
+
+3. Build the configuration:
+   ```bash
+   ./build-config.sh
    ```
 
 ### 5. Test the Integration
 
-1. Start your test server: `bash test-mobile.sh`
+1. Start your test server (automatically builds config): `bash test-mobile.sh`
 2. Navigate to: `http://localhost:8080/forked/sync-test.html`
 3. Click "Initialize Google Drive" → "Authenticate"
 4. You'll see "Google hasn't verified this app" - this is normal for testing mode

@@ -77,3 +77,9 @@ The app uses an abstract `CloudStorageProvider` interface that allows swapping b
 - **Sync Manager**: `sync-manager.js` - Provider-agnostic sync logic
 
 This design allows easy addition of Dropbox, OneDrive, S3, or any other storage backend without changing the core application logic.
+
+### Environment Configuration
+- Use `.env` file for sensitive credentials (never commit)
+- `build-config.sh` generates `config.js` from `.env` 
+- Automatic config building in test server
+- Future providers can add their credentials to same `.env` file

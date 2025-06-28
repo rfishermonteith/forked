@@ -92,12 +92,9 @@
     </div>
 
     <script type="module">
-        // First, let's set up the Google Client ID
-        // YOU NEED TO REPLACE THIS WITH YOUR ACTUAL CLIENT ID
-        const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
-        
         // Import modules
         import { get, set } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
+        import { CONFIG } from './config.js';
         
         // Import our cloud sync modules
         import './cloud-storage-interface.js';
@@ -176,7 +173,7 @@
             statusTextEl.textContent = 'Initializing...';
             
             try {
-                await syncManager.initProvider('google-drive', { clientId: GOOGLE_CLIENT_ID });
+                await syncManager.initProvider('google-drive', { clientId: CONFIG.google.clientId });
                 await updateStatus();
                 await displayRecipes();
             } catch (error) {

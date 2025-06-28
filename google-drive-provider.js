@@ -1,4 +1,5 @@
 import { CloudStorageProvider } from './cloud-storage-interface.js';
+import { CONFIG } from './config.js';
 
 /**
  * Google Drive implementation of CloudStorageProvider
@@ -6,7 +7,7 @@ import { CloudStorageProvider } from './cloud-storage-interface.js';
 export class GoogleDriveProvider extends CloudStorageProvider {
   constructor(config = {}) {
     super(config);
-    this.clientId = config.clientId || 'YOUR_CLIENT_ID_HERE';
+    this.clientId = config.clientId || CONFIG.google.clientId;
     this.scopes = 'https://www.googleapis.com/auth/drive.file';
     this.discoveryDoc = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
     this.tokenClient = null;
