@@ -8,7 +8,7 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   constructor(config = {}) {
     super(config);
     this.clientId = config.clientId || CONFIG.google.clientId;
-    this.scopes = 'https://www.googleapis.com/auth/drive.file';
+    this.scopes = 'https://www.googleapis.com/auth/drive';
     this.discoveryDoc = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
     this.tokenClient = null;
     this.recipeFolderId = null;
