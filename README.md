@@ -77,3 +77,73 @@ Some nice-to-haves:
 **Common Issues:**
 - **"Install" not appearing:** Visit site twice, wait 30 seconds between visits
 - **Service Worker not registering:** Check console, ensure HTTPS/localhost, clear browser data
+
+## Google Drive Sync Setup (Phase 2)
+
+Follow these steps to enable Google Drive sync for multi-device access.
+
+### 1. Create Google Cloud Project
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Click "Select a project" → "New Project"
+3. Name it "Recipe Box" (or your preferred name)
+4. Click "Create"
+
+### 2. Enable Google Drive API
+
+1. In your project, go to "APIs & Services" → "Library"
+2. Search for "Google Drive API"
+3. Click on it and press "Enable"
+
+### 3. Create OAuth 2.0 Credentials
+
+1. Go to "APIs & Services" → "Credentials"
+2. Click "Create Credentials" → "OAuth client ID"
+3. If prompted, configure OAuth consent screen first:
+   - User Type: External
+   - App name: Recipe Box
+   - User support email: your email
+   - Developer contact: your email
+   - Click "Save and Continue"
+   - Scopes: Add `../auth/drive.file` 
+   - Test users: Add your email and partner's email
+   - Click "Save and Continue"
+
+4. Back to creating OAuth client ID:
+   - Application type: Web application
+   - Name: Recipe Box Web
+   - Authorized JavaScript origins:
+     - `http://localhost:8080`
+     - `https://yourusername.github.io`
+   - No redirect URIs needed
+   - Click "Create"
+
+5. Copy your Client ID (looks like: `123456789-abcdefg.apps.googleusercontent.com`)
+
+### 4. Update Your Code
+
+1. Edit `sync-test.html` and replace:
+   ```javascript
+   const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
+   ```
+   with your actual Client ID.
+
+2. Do the same in `google-drive-provider.js`:
+   ```javascript
+   this.clientId = config.clientId || 'YOUR_CLIENT_ID_HERE';
+   ```
+
+### 5. Test the Integration
+
+1. Start your test server: `bash test-mobile.sh`
+2. Navigate to: `http://localhost:8080/forked/sync-test.html`
+3. Click "Initialize Google Drive" → "Authenticate"
+4. You'll see "Google hasn't verified this app" - this is normal for testing mode
+5. Click "Continue" (it's safe - it's your own app)
+6. Test creating a recipe and syncing!
+
+### Important Notes
+
+- **Testing Mode**: Perfect for personal use (max 100 users)
+- **No Review Needed**: Testing mode works indefinitely for personal projects
+- **Security**: Client ID is public by design, no API key needed

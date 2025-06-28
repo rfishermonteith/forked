@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloud Sync Test - Recipe Box</title>
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            background: #f0f0f0;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .progress {
+            margin: 20px 0;
+            padding: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+        }
+        .hidden {
+            display: none;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cloud Sync Test</h1>
+    
+    <div class="status" id="status">
+        <strong>Status:</strong> <span id="statusText">Not initialized</span>
+    </div>
+
+    <div>
+        <button id="initBtn">Initialize Google Drive</button>
+        <button id="authBtn" disabled>Authenticate</button>
+        <button id="signOutBtn" disabled>Sign Out</button>
+        <button id="syncBtn" disabled>Sync Now</button>
+    </div>
+
+    <div class="progress hidden" id="progress">
+        <strong>Sync Progress:</strong>
+        <div id="progressText"></div>
+        <progress id="progressBar" max="100" value="0"></progress>
+    </div>
+
+    <div id="results">
+        <h2>Local Recipes</h2>
+        <pre id="localRecipes">No recipes loaded</pre>
+        
+        <h2>Cloud Recipes</h2>
+        <pre id="cloudRecipes">Not connected</pre>
+    </div>
+
+    <div>
+        <h2>Test Recipe Creation</h2>
+        <button id="createTestBtn">Create Test Recipe</button>
+    </div>
+
+    <script type="module">
+        // First, let's set up the Google Client ID
+        // YOU NEED TO REPLACE THIS WITH YOUR ACTUAL CLIENT ID
+        const GOOGLE_CLIENT_ID = 'YOUR_CLIENT_ID_HERE';
+        
+        // Import modules
+        import { get, set } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
+        
+        // Import our cloud sync modules
+        import './cloud-storage-interface.js';
+        import './google-drive-provider.js';
+        import { SyncManager } from './sync-manager.js';
+        
+        // Create sync manager instance
+        const syncManager = new SyncManager();
+        
+        // UI elements
+        const statusEl = document.getElementById('status');
+        const statusTextEl = document.getElementById('statusText');
+        const initBtn = document.getElementById('initBtn');
+        const authBtn = document.getElementById('authBtn');
+        const signOutBtn = document.getElementById('signOutBtn');
+        const syncBtn = document.getElementById('syncBtn');
+        const progressEl = document.getElementById('progress');
+        const progressTextEl = document.getElementById('progressText');
+        const progressBarEl = document.getElementById('progressBar');
+        const localRecipesEl = document.getElementById('localRecipes');
+        const cloudRecipesEl = document.getElementById('cloudRecipes');
+        const createTestBtn = document.getElementById('createTestBtn');
+        
+        // Update status display
+        async function updateStatus() {
+            const status = await syncManager.getStatus();
+            const isAuth = await syncManager.isAuthenticated();
+            
+            if (status.connected) {
+                statusEl.className = 'status connected';
+                statusTextEl.textContent = `Connected to ${status.provider}`;
+                authBtn.disabled = true;
+                signOutBtn.disabled = false;
+                syncBtn.disabled = status.syncInProgress;
+            } else if (syncManager.provider) {
+                statusEl.className = 'status';
+                statusTextEl.textContent = 'Not authenticated';
+                authBtn.disabled = false;
+                signOutBtn.disabled = true;
+                syncBtn.disabled = true;
+            } else {
+                statusEl.className = 'status';
+                statusTextEl.textContent = 'Not initialized';
+                authBtn.disabled = true;
+                signOutBtn.disabled = true;
+                syncBtn.disabled = true;
+            }
+            
+            if (status.lastSync) {
+                statusTextEl.textContent += ` - Last sync: ${new Date(status.lastSync).toLocaleString()}`;
+            }
+        }
+        
+        // Display recipes
+        async function displayRecipes() {
+            const localRecipes = await get('recipeData') || [];
+            localRecipesEl.textContent = JSON.stringify(localRecipes, null, 2);
+            
+            if (await syncManager.isAuthenticated()) {
+                try {
+                    // This would normally be part of sync, but for testing we'll fetch directly
+                    const provider = syncManager.provider;
+                    const cloudRecipes = await provider.listRecipes();
+                    cloudRecipesEl.textContent = JSON.stringify(cloudRecipes, null, 2);
+                } catch (error) {
+                    cloudRecipesEl.textContent = `Error: ${error.message}`;
+                }
+            } else {
+                cloudRecipesEl.textContent = 'Not connected';
+            }
+        }
+        
+        // Event handlers
+        initBtn.addEventListener('click', async () => {
+            initBtn.disabled = true;
+            statusTextEl.textContent = 'Initializing...';
+            
+            try {
+                await syncManager.initProvider('google-drive', { clientId: GOOGLE_CLIENT_ID });
+                await updateStatus();
+                await displayRecipes();
+            } catch (error) {
+                statusEl.className = 'status error';
+                statusTextEl.textContent = `Error: ${error.message}`;
+            }
+        });
+        
+        authBtn.addEventListener('click', async () => {
+            authBtn.disabled = true;
+            statusTextEl.textContent = 'Authenticating...';
+            
+            const result = await syncManager.authenticate();
+            if (result.success) {
+                await updateStatus();
+                await displayRecipes();
+            } else {
+                statusEl.className = 'status error';
+                statusTextEl.textContent = `Auth failed: ${result.error}`;
+                authBtn.disabled = false;
+            }
+        });
+        
+        signOutBtn.addEventListener('click', async () => {
+            await syncManager.signOut();
+            await updateStatus();
+            await displayRecipes();
+        });
+        
+        syncBtn.addEventListener('click', async () => {
+            progressEl.classList.remove('hidden');
+            
+            const result = await syncManager.sync((progress) => {
+                progressTextEl.textContent = `${progress.status}: ${progress.progress}%`;
+                if (progress.current) {
+                    progressTextEl.textContent += ` - ${progress.current}`;
+                }
+                progressBarEl.value = progress.progress;
+            });
+            
+            if (result.success) {
+                progressTextEl.textContent = `Sync complete! Uploaded: ${result.uploaded}, Downloaded: ${result.downloaded}`;
+            } else {
+                progressTextEl.textContent = `Sync failed: ${result.error}`;
+            }
+            
+            await updateStatus();
+            await displayRecipes();
+            
+            setTimeout(() => progressEl.classList.add('hidden'), 5000);
+        });
+        
+        createTestBtn.addEventListener('click', async () => {
+            const testRecipe = {
+                name: `test-recipe-${Date.now()}.md`,
+                content: `---
+title: Test Recipe ${new Date().toLocaleString()}
+ingredients:
+  - Test ingredient 1
+  - Test ingredient 2
+---
+
+# Test Recipe
+
+This is a test recipe created at ${new Date().toLocaleString()}.
+
+## Instructions
+1. This is step one
+2. This is step two
+`,
+                lastModified: Date.now(),
+                size: 200
+            };
+            
+            const recipes = await get('recipeData') || [];
+            recipes.push(testRecipe);
+            await set('recipeData', recipes);
+            
+            await displayRecipes();
+            alert('Test recipe created! Click "Sync Now" to upload to Google Drive.');
+        });
+        
+        // Initial setup
+        updateStatus();
+        displayRecipes();
+    </script>
+</body>
+</html>
