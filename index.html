@@ -1,63 +1,434 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<title>Recipe viewer (ES-module edition)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A local-first recipe management app">
+<meta name="theme-color" content="#2c3e50">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Recipe Box</title>
 <style>
-  body      { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 2rem; }
-  input     { margin-bottom: 1.5rem; }
-  article   { max-width: 48rem; }
-  h1        { margin-top: 0; line-height: 1.2; }
-  img       { max-width: 100%; height: auto; display: block; margin: 1rem 0; }
+  body {
+    font: 16px/1.5 system-ui, sans-serif;
+    margin: 0;
+    padding: 0 2rem;
+  }
+  header {
+    margin: 2rem 0 1rem;
+  }
+  ul {
+    list-style: none;
+    padding-left: 0;
+  }
+  li {
+    margin: .25rem 0;
+  }
+  a {
+    text-decoration: none;
+    color: #0366d6;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  h1 {
+    margin: 0 0 1rem;
+    font-size: 1.8rem;
+  }
+  img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+    margin: 1rem 0;
+  }
+  .pick {
+    margin: 1.5rem 0;
+  }
+  .hidden {
+    display: none;
+  }
+  .install-banner {
+    background: #2c3e50;
+    color: white;
+    padding: 1rem 2rem;
+    margin: 0 -2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .install-banner button {
+    background: white;
+    color: #2c3e50;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  .install-banner button:hover {
+    opacity: 0.9;
+  }
+  .debug-info {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    background: rgba(0,0,0,0.8);
+    color: white;
+    padding: 10px;
+    font-size: 12px;
+    border-radius: 4px;
+    max-width: 300px;
+    z-index: 1000;
+  }
 </style>
+</head>
+<body>
+<div id="install-banner" class="install-banner hidden">
+  <span>Install Recipe Box for easy access</span>
+  <button id="install-btn">Install</button>
+</div>
+<header>
+  <button class="pick" id="pickDir">Open recipe folder</button>
+  <ul id="index"></ul>
+</header>
 
-<input type="file" id="pick" accept=".md">
-<article id="out"></article>
+<article id="viewer"></article>
+
+<div id="debug-info" class="debug-info" style="display: none;"></div>
 
 <script type="module">
-  /* ---- ES-module imports (no globals) ------------------------------- */
-  import matter      from 'https://cdn.jsdelivr.net/npm/gray-matter@4.0.3/+esm';
-  import markdownIt  from 'https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/+esm';
-  import DOMPurify   from 'https://cdn.jsdelivr.net/npm/dompurify@3.2.5/+esm';
+  import matter from 'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm';
+  import markdownIt from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
+  import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3/+esm';
+  import { get, set, clear } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
-  /* ---- Configure Markdown-it --------------------------------------- */
+  /* Init markdown-it  */
   const md = markdownIt({
-    html:        true,   // allow raw HTML in markdown
-    linkify:     true,   // autolink URLs
-    typographer: true    // nice quotes / dashes
+    html: true,
+    linkify: true,
+    typographer: true
   });
 
-  /* ---- File-picker logic ------------------------------------------- */
-  const picker  = document.getElementById('pick');
-  const output  = document.getElementById('out');
+  // Global state
+  let dirHandle = null;
+  const slugToFile = new Map();
 
-  picker.addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  // UI references
+  const pickBtn = document.getElementById('pickDir');
+  const indexUl = document.getElementById('index');
+  const viewer = document.getElementById('viewer');
 
-    /* 1. read file text */
+  // Helper functions
+  const slugify = (s) =>
+    s.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+  const renderIndex = async () => {
+    indexUl.innerHTML = '';
+    slugToFile.clear();
+    
+    // Handle both directory handles and file arrays
+    if (Array.isArray(dirHandle)) {
+      // Fallback mode: array of files
+      for (const file of dirHandle) {
+        if (file.name.endsWith('.md')) {
+          const slug = slugify(file.name.replace(/\.md$/, ''));
+          slugToFile.set(slug, file);
+          const li = document.createElement('li');
+          li.innerHTML = `<a href="#recipe=${slug}">${file.name.replace(/\.md$/, '')}</a>`;
+          indexUl.appendChild(li);
+        }
+      }
+    } else {
+      // Modern mode: directory handle
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file' && entry.name.endsWith('.md')) {
+          const slug = slugify(entry.name.replace(/\.md$/, ''));
+          slugToFile.set(slug, entry);
+          const li = document.createElement('li');
+          li.innerHTML = `<a href="#recipe=${slug}">${entry.name.replace(/\.md$/, '')}</a>`;
+          indexUl.appendChild(li);
+        }
+      }
+    }
+  };
+
+  const renderRecipe = async (slug) => {
+    const entry = slugToFile.get(slug);
+    if (!entry) {
+      viewer.textContent = 'Recipe not found.';
+      return;
+    }
+
+    const file = entry.getFile ? await entry.getFile() : entry;  // Works for both FileSystemFileHandle and File
     const text = await file.text();
-
-    /* 2. split front-matter (data) & body (content) */
     const { data: fm, content } = matter(text);
 
-    /* 3. render markdown → HTML and sanitize */
     let html = md.render(content);
-    html     = DOMPurify.sanitize(html);
+    html = DOMPurify.sanitize(html);
 
-    /* 4. inject into page (use front-matter fields where you like) */
-    output.innerHTML = `
-      <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
-      ${Array.isArray(fm.ingredients) ? `
-    <h2>What you'll need</h2>
-    <ul>
-      ${fm.ingredients
-        .map(line => `<li>${DOMPurify.sanitize(line)}</li>`)
-        .join('')}
-    </ul>
-  ` : ''}
-      ${fm.image   ? `<img src="${fm.image}" alt="">` : ''}
-      ${fm.servings? `<p><em>Servings: ${fm.servings}</em></p>` : ''}
-      <h2>What to do</h2>
-      ${html}
-    `;
+    // Inject into DOM
+    viewer.innerHTML = `
+    <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
+    ${fm.image ? `<img src="${fm.image}" alt="">` : ''}
+    ${Array.isArray(fm.ingredients) ? `
+      <h2>What you'll need</h2>
+      <ul>${fm.ingredients.map(i => `<li>${DOMPurify.sanitize(i)}</li>`).join('')}</ul>` : ''}
+    <h2>What to do</h2>
+    ${html}
+  `;
+  };
+
+  async function verifyPermission(handle, mode = 'read') {
+    const opts = { mode };
+    // Was permission already granted?
+    console.log(await handle.queryPermission(opts))
+    if ((await handle.queryPermission(opts)) === 'granted') return true;
+    // If not, ask (only once per session)
+    return (await handle.requestPermission(opts)) === 'granted';
+  }
+
+
+  // Routing: react to hash
+  const route = () => {
+    const match = location.hash.match(/recipe=([\w-]+)/);
+    if (match && dirHandle) renderRecipe(match[1]);
+  };
+  window.addEventListener('hashchange', route);
+
+  async function pickRecipeFolder() {
+    if ('showDirectoryPicker' in window) {
+      // Modern Chromium path (read + write)
+      return await window.showDirectoryPicker();
+    }
+
+    // Fallback: let user pick a whole folder read-only (WebKit proprietary)
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.webkitdirectory = true;
+      input.multiple = true;
+      input.addEventListener('change', () => {
+        resolve(Array.from(input.files));
+      });
+      input.click();
+    });
+  }
+
+  // Auto-restore directory permission on reload
+  pickBtn.addEventListener('click', async () => {
+    dirHandle = await pickRecipeFolder();
+    if (dirHandle) {
+      // Save both directory handles and file arrays
+      if (dirHandle.kind === 'directory') {
+        // Modern browsers: save directory handle
+        await set('recipeDirHandle', dirHandle);
+      } else if (Array.isArray(dirHandle)) {
+        // Fallback browsers: Store recipe content in IndexedDB for persistence
+        console.log('Storing recipe files in IndexedDB for persistence...');
+        const recipes = [];
+        for (const file of dirHandle) {
+          if (file.name.endsWith('.md')) {
+            const content = await file.text();
+            recipes.push({
+              name: file.name,
+              content: content,
+              lastModified: file.lastModified,
+              size: file.size
+            });
+          }
+        }
+        await set('recipeData', recipes);
+        console.log(`Stored ${recipes.length} recipes in IndexedDB`);
+      }
+      await renderIndex();
+      indexUl.classList.remove('hidden');
+      route();
+    }
   });
+  (async () => {
+    try {
+      // Try to restore directory handle first (modern browsers)
+      const saved = await get('recipeDirHandle');
+      if (saved && await verifyPermission(saved, 'read')) {
+        dirHandle = saved;
+        await renderIndex();
+        indexUl.classList.remove('hidden');
+        route();
+        return;
+      }
+    } catch (err) {
+      console.log('Error restoring directory handle:', err);
+    }
+    
+    try {
+      // Fallback: try to restore recipe data (Android/fallback browsers)
+      const recipeData = await get('recipeData');
+      if (recipeData && recipeData.length > 0) {
+        console.log(`Restored ${recipeData.length} recipes from IndexedDB`);
+        // Create mock File objects from stored data
+        dirHandle = recipeData.map(recipe => new File([recipe.content], recipe.name, {
+          type: 'text/markdown',
+          lastModified: recipe.lastModified
+        }));
+        await renderIndex();
+        indexUl.classList.remove('hidden');
+        route();
+      }
+    } catch (err) {
+      console.log('Error restoring recipe data:', err);
+    }
+  })();
+
+  // PWA Service Worker Registration
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/forked/sw.js');
+        console.log('ServiceWorker registration successful:', registration.scope);
+        
+        // Handle updates
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // New service worker available
+              console.log('New content available; refresh to update.');
+            }
+          });
+        });
+      } catch (err) {
+        console.log('ServiceWorker registration failed:', err);
+      }
+    });
+  }
+
+  // PWA Install prompt
+  let deferredPrompt;
+  const installBanner = document.getElementById('install-banner');
+  const installBtn = document.getElementById('install-btn');
+  
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Only show banner if not already running as installed PWA
+    if (!isRunningStandalone()) {
+      installBanner.classList.remove('hidden');
+    }
+  });
+  
+  // Check if app is running in standalone mode (installed PWA)
+  function isRunningStandalone() {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                      window.navigator.standalone === true ||
+                      document.referrer.includes('android-app://') ||
+                      window.matchMedia('(display-mode: fullscreen)').matches ||
+                      window.matchMedia('(display-mode: minimal-ui)').matches;
+    
+    console.log('PWA Standalone Detection:', {
+      'display-mode: standalone': window.matchMedia('(display-mode: standalone)').matches,
+      'navigator.standalone': window.navigator.standalone,
+      'referrer': document.referrer,
+      'display-mode: fullscreen': window.matchMedia('(display-mode: fullscreen)').matches,
+      'display-mode: minimal-ui': window.matchMedia('(display-mode: minimal-ui)').matches,
+      'final result': standalone
+    });
+    
+    return standalone;
+  }
+  
+  // Hide banner if already running as PWA
+  async function checkAndHideBanner() {
+    // Check if previously installed
+    const wasInstalled = await get('appInstalled');
+    const isStandalone = isRunningStandalone();
+    
+    // Show debug info on screen
+    const debugDiv = document.getElementById('debug-info');
+    if (debugDiv) {
+      debugDiv.innerHTML = `
+        <strong>PWA Debug Info:</strong><br>
+        Current URL: ${window.location.href}<br>
+        Standalone: ${isStandalone}<br>
+        Was Installed: ${wasInstalled}<br>
+        Display Mode: ${window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser'}<br>
+        Navigator Standalone: ${window.navigator.standalone}<br>
+        Referrer: ${document.referrer}<br>
+        User Agent: ${navigator.userAgent.substring(0, 50)}...<br>
+        <button onclick="clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
+      `;
+      debugDiv.style.display = 'block';
+      
+      // Hide debug after 10 seconds
+      setTimeout(() => debugDiv.style.display = 'none', 10000);
+    } else {
+      console.error('Debug div not found!');
+    }
+    
+    if (isStandalone || wasInstalled) {
+      console.log('Running as PWA or previously installed - hiding install banner');
+      if (installBanner) {
+        installBanner.classList.add('hidden');
+        installBanner.style.display = 'none'; // Force hide with CSS
+        if (debugDiv) debugDiv.innerHTML += `<br><strong>Banner Hidden:</strong> YES`;
+      } else {
+        if (debugDiv) debugDiv.innerHTML += `<br><strong>ERROR:</strong> Banner element not found!`;
+      }
+    } else {
+      console.log('Running in browser - install banner may be shown');
+      if (debugDiv) debugDiv.innerHTML += `<br><strong>Banner:</strong> Should be visible`;
+    }
+  }
+  
+  // Only check after DOM is loaded to ensure elements exist
+  document.addEventListener('DOMContentLoaded', checkAndHideBanner);
+  
+  // Also check when page is fully loaded
+  window.addEventListener('load', checkAndHideBanner);
+  
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to install prompt: ${outcome}`);
+    deferredPrompt = null;
+    installBanner.classList.add('hidden');
+  });
+  
+  // Hide banner if already installed
+  window.addEventListener('appinstalled', async () => {
+    console.log('Recipe Box app installed');
+    installBanner.classList.add('hidden');
+    // Remember that the app was installed
+    await set('appInstalled', true);
+  });
+
+  // Function to clear cache and reload (for debugging)
+  window.clearCacheAndReload = async () => {
+    try {
+      // Clear service worker caches
+      const cacheNames = await caches.keys();
+      await Promise.all(cacheNames.map(name => caches.delete(name)));
+      
+      // Clear IndexedDB data
+      await clear();
+      
+      // Unregister service worker
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map(reg => reg.unregister()));
+      }
+      
+      // Force reload
+      window.location.reload(true);
+    } catch (err) {
+      console.error('Error clearing cache:', err);
+      window.location.reload(true);
+    }
+  };
 </script>
+</body>
+</html>

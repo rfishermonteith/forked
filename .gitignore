@@ -1,0 +1,27 @@
+# IDE folders
+.idea/
+.vscode/
+
+# System folders
+.stfolder/
+.DS_Store
+Thumbs.db
+
+# Node modules (for future use)
+node_modules/
+
+# Build artifacts
+dist/
+build/
+
+# Environment files
+.env
+.env.local
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+~*
