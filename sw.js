@@ -1,4 +1,4 @@
-const VERSION = '0.0.3';
+const VERSION = '0.1.0';
 const CACHE_NAME = `recipe-app-v${VERSION}`;
 const urlsToCache = [
   '/forked/',
@@ -11,7 +11,10 @@ const urlsToCache = [
   'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm',
   'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm',
   'https://cdn.jsdelivr.net/npm/dompurify@3/+esm',
-  'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm'
+  'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm',
+  // Google APIs for sync functionality
+  'https://apis.google.com/js/api.js',
+  'https://accounts.google.com/gsi/client'
 ];
 
 // Install event - cache files
@@ -78,7 +81,9 @@ self.addEventListener('fetch', event => {
           const url = new URL(event.request.url);
           if (url.origin === location.origin || 
               url.hostname === 'unpkg.com' ||
-              url.hostname === 'cdn.jsdelivr.net') {
+              url.hostname === 'cdn.jsdelivr.net' ||
+              url.hostname === 'apis.google.com' ||
+              url.hostname === 'accounts.google.com') {
             caches.open(CACHE_NAME)
               .then(cache => {
                 cache.put(event.request, responseToCache);

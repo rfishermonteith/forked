@@ -16,21 +16,26 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   async init() {
-    // Load Google API scripts
-    await this.loadScript('https://apis.google.com/js/api.js');
-    await new Promise((resolve) => gapi.load('client', resolve));
+    // Load Google Identity Services (modern approach)
     await this.loadScript('https://accounts.google.com/gsi/client');
     
-    // Initialize Google API client (no API key needed for OAuth)
+    // Load Google API client for Drive API calls
+    await this.loadScript('https://apis.google.com/js/api.js');
+    await new Promise((resolve) => gapi.load('client', resolve));
+    
+    // Initialize Google API client for Drive API
     await gapi.client.init({
       discoveryDocs: [this.discoveryDoc],
     });
 
-    // Initialize token client for OAuth 2.0
+    // Initialize modern OAuth 2.0 token client
     this.tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: this.clientId,
       scope: this.scopes,
       callback: '', // Will be set in authenticate()
+      error_callback: (error) => {
+        console.error('OAuth error:', error);
+      },
     });
 
     // Check if already authenticated
@@ -45,19 +50,26 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     return new Promise((resolve) => {
       this.tokenClient.callback = async (resp) => {
         if (resp.error !== undefined) {
+          console.error('Authentication error:', resp.error);
           resolve({ success: false, error: resp.error });
           return;
         }
+        
+        console.log('Authentication successful');
         this.isAuthenticated = true;
         resolve({ success: true });
       };
       
-      // Request access token
-      if (gapi.client.getToken() === null) {
-        // First time - request with consent
-        this.tokenClient.requestAccessToken({ prompt: 'consent' });
+      // Check if we already have a valid token
+      const existingToken = gapi.client.getToken();
+      if (existingToken === null) {
+        // First time authentication - request with consent
+        this.tokenClient.requestAccessToken({ 
+          prompt: 'consent',
+          hint: 'Select or create the account you want to use for Recipe Box'
+        });
       } else {
-        // Try to refresh existing token
+        // Try to refresh/reuse existing token
         this.tokenClient.requestAccessToken({ prompt: '' });
       }
     });
@@ -66,9 +78,15 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   async signOut() {
     const token = gapi.client.getToken();
     if (token !== null) {
-      google.accounts.oauth2.revoke(token.access_token);
+      // Revoke the token using modern GIS
+      google.accounts.oauth2.revoke(token.access_token, () => {
+        console.log('Access token revoked');
+      });
+      
+      // Clear the token from the client
       gapi.client.setToken('');
       this.isAuthenticated = false;
+      console.log('User signed out successfully');
     }
   }
 
