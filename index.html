@@ -744,8 +744,11 @@
       }
     } catch (error) {
       console.log('Sync not available:', error.message);
-      // Hide sync panel if config is missing
-      document.querySelector('.sync-panel').style.display = 'none';
+      // Hide settings dropdown if config is missing
+      const settingsDropdown = document.querySelector('.menu-dropdown:nth-child(2)');
+      if (settingsDropdown) {
+        settingsDropdown.style.display = 'none';
+      }
       return;
     }
   }
