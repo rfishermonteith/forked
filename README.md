@@ -1,5 +1,31 @@
 # forked
 
+A local-first Progressive Web App for sharing recipes between partners/family, with optional Google Drive sync for multi-device access.
+
+## Current Features ✅
+
+1. **Beautiful Recipe Display** - Clean, minimal interface with pictures
+2. **Multi-Device Access** - Works on desktop (Windows, Mac, Linux) and mobile (Android)
+3. **Google Drive Sync** - Automatic sync from your Google Drive folder
+4. **Offline Support** - PWA works without internet after first load
+5. **Persistent Authentication** - Stay logged in across sessions
+6. **Smart Folder Discovery** - Finds your RecipeBox folder even with 100+ folders
+7. **Markdown + YAML Format** - Future-proof, interoperable recipe storage
+
+## Planned Features 🚧
+
+1. **Beautiful Design** - Modern, kitchen-friendly UI with better typography and layout
+2. **Recipe Editing** - Edit recipes directly in the app
+3. **Recipe Creation** - Add new recipes with built-in editor
+4. **Two-Way Sync** - Push local changes back to Google Drive
+5. **Recipe Management** - Delete, organize, and tag recipes
+6. **Search & Filter** - Find recipes by ingredients, tags, or content
+7. **Recipe Sharing** - Share as image, PDF, or webpage
+8. **Shopping List Export** - Extract ingredients to shopping list
+9. **OCR Import** - Add recipes by photo or copy-paste (via LLM)
+
+## Project Vision
+
 This repo is a way for my partner and I to share our collection of recipes between us, which will allow us to:
 1. Access them from anywhere (e.g. in the kitchen, at the shops)
 2. Edit them easily (e.g. in a text editor or browser)
@@ -15,15 +41,17 @@ Some nice-to-haves:
 3. This should leave the syncing to another service
 4. We should be able to export the ingredients for a recipe to a shopping list
 
-## Steps to complete:
-- [ ] Decide on a format to store the recipes
-- [ ] Decide how to render the recipes
-- [ ] Implement recipe rendering
-- [ ] Decide how to sync between devices
-- [ ] Implement syncing
-- [ ] Implement recipe printing and sharing
-- [ ] Implement editor for recipes (WYSIWYG if possible)
-- [ ] Implement OCR and text import of recipes (likely via LLM)
+## Implementation Status
+
+- ✅ **Phase 1**: PWA Foundation (service worker, offline, installable)
+- ✅ **Phase 2**: Google Drive Integration (authentication, sync, folder discovery) 
+- 🚧 **Phase 3**: Beautiful Design & Recipe Management (UI improvements, editing, creation)
+- 🔄 **Phase 4**: Advanced Features (two-way sync, search, sharing)
+
+### Current Priorities
+1. **Beautiful Design** (Top Priority) - Modern, kitchen-friendly UI
+2. **Recipe Editing** - Edit existing recipes in-app
+3. **Recipe Creation** - Add new recipes with built-in editor
 
 ## Testing on Mobile (Termux/Android)
 
@@ -78,76 +106,59 @@ Some nice-to-haves:
 - **"Install" not appearing:** Visit site twice, wait 30 seconds between visits
 - **Service Worker not registering:** Check console, ensure HTTPS/localhost, clear browser data
 
-## Google Drive Sync Setup (Phase 2)
+## Google Drive Sync Setup ✅
 
-Follow these steps to enable Google Drive sync for multi-device access.
+Google Drive sync is now working! The app automatically finds and syncs from a "RecipeBox" folder in your Google Drive.
 
-### 1. Create Google Cloud Project
+### Quick Setup
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Click "Select a project" → "New Project"
-3. Name it "Recipe Box" (or your preferred name)
-4. Click "Create"
+1. **Create a RecipeBox folder** in your Google Drive root
+2. **Add your recipe .md files** to this folder
+3. **Visit the app** and click "Connect to Google Drive"
+4. **Grant permissions** when prompted
+5. **Your recipes sync automatically!**
 
-### 2. Enable Google Drive API
+### How It Works
 
-1. In your project, go to "APIs & Services" → "Library"
-2. Search for "Google Drive API"
-3. Click on it and press "Enable"
+- **Smart Discovery**: Finds your RecipeBox folder even with 100+ folders in Drive
+- **Persistent Auth**: Stays logged in across browser sessions
+- **Auto-Sync**: Recipes appear immediately after connecting
+- **Offline Support**: Recipes cached locally for offline viewing
 
-### 3. Create OAuth 2.0 Credentials
+### Recipe Format
 
-1. Go to "APIs & Services" → "Credentials"
-2. Click "Create Credentials" → "OAuth client ID"
-3. If prompted, configure OAuth consent screen first:
-   - User Type: External
-   - App name: Recipe Box
-   - User support email: your email
-   - Developer contact: your email
-   - Click "Save and Continue"
-   - Scopes: Add `../auth/drive` (allows access to manually added files)
-   - Test users: Add your email and partner's email
-   - Click "Save and Continue"
+Store recipes as `.md` files with YAML frontmatter:
 
-4. Back to creating OAuth client ID:
-   - Application type: Web application
-   - Name: Recipe Box Web
-   - Authorized JavaScript origins:
-     - `http://localhost:8080`
-     - `https://yourusername.github.io`
-   - No redirect URIs needed
-   - Click "Create"
+```markdown
+---
+title: Delicious Pasta
+ingredients:
+  - 400g pasta
+  - 2 cloves garlic
+  - olive oil
+image: https://example.com/pasta.jpg
+---
 
-5. Copy your Client ID (looks like: `123456789-abcdefg.apps.googleusercontent.com`)
+# Instructions
 
-### 4. Configure Environment
+1. Boil water and cook pasta
+2. Sauté garlic in olive oil
+3. Combine and serve!
+```
 
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
+### For Developers
 
-2. Edit `.env` and add your Client ID:
-   ```bash
-   GOOGLE_CLIENT_ID=123456789-abcdefg.apps.googleusercontent.com
-   ```
+To set up your own instance with a different Google Cloud project:
 
-3. Build the configuration:
-   ```bash
-   ./build-config.sh
-   ```
+1. Create OAuth 2.0 credentials in Google Cloud Console
+2. Configure authorized domains for your deployment  
+3. Update the client ID in `config.js`
+4. Deploy to your preferred hosting
 
-### 5. Test the Integration
+### Current Limitations
 
-1. Start your test server (automatically builds config): `bash test-mobile.sh`
-2. Navigate to: `http://localhost:8080/forked/sync-test.html`
-3. Click "Initialize Google Drive" → "Authenticate"
-4. You'll see "Google hasn't verified this app" - this is normal for testing mode
-5. Click "Continue" (it's safe - it's your own app)
-6. Test creating a recipe and syncing!
+- **Read-Only**: Can view and sync recipes from Drive, but can't edit yet
+- **One-Way Sync**: Drive → App only (no local changes pushed back)
+- **Manual Folder**: Must create "RecipeBox" folder manually
 
-### Important Notes
-
-- **Testing Mode**: Perfect for personal use (max 100 users)
-- **No Review Needed**: Testing mode works indefinitely for personal projects
-- **Security**: Client ID is public by design, no API key needed
+These will be addressed in upcoming releases!
