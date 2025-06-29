@@ -1,6 +1,7 @@
 #!/bin/bash
 # Mobile testing script for Termux/Android
-# Run: bash test-mobile.sh
+# Run: bash test-mobile.sh [port]
+# Default port is 8080
 
 echo "📱 Recipe App Mobile Test Server"
 echo "================================"
@@ -27,16 +28,17 @@ else
     LOCAL_IP=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -n1)
 fi
 
-PORT=8080
+# Get port from command line argument or default to 8080
+PORT=${1:-8080}
 
-# Create simple Python server
-cat > server.py << 'EOF'
+# Create simple Python server with dynamic port
+cat > server.py << EOF
 import http.server
 import socketserver
 import os
 import urllib.parse
 
-PORT = 8080
+PORT = $PORT
 
 class PWAHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):

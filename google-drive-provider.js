@@ -38,12 +38,38 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       },
     });
 
-    // Check if already authenticated
-    this.isAuthenticated = await this.checkAuth();
+    // Try to restore saved token
+    const savedToken = this.getSavedToken();
+    if (savedToken) {
+      gapi.client.setToken(savedToken);
+      console.log('Restored saved authentication token');
+      
+      // Check if already authenticated (this will validate the token)
+      this.isAuthenticated = await this.checkAuth();
+      
+      if (!this.isAuthenticated) {
+        console.log('Saved token was invalid or expired');
+      }
+    } else {
+      this.isAuthenticated = false;
+    }
   }
 
   async checkAuth() {
-    return gapi.client.getToken() !== null;
+    const token = gapi.client.getToken();
+    if (!token) return false;
+    
+    // Verify token is still valid by making a test API call
+    try {
+      await gapi.client.drive.about.get({ fields: 'user' });
+      return true;
+    } catch (error) {
+      console.log('Token validation failed:', error);
+      // Clear invalid token
+      gapi.client.setToken('');
+      this.clearSavedToken();
+      return false;
+    }
   }
 
   async authenticate() {
@@ -57,6 +83,10 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         
         console.log('Authentication successful');
         this.isAuthenticated = true;
+        
+        // Save the token for persistence
+        this.saveToken();
+        
         resolve({ success: true });
       };
       
@@ -86,12 +116,18 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       // Clear the token from the client
       gapi.client.setToken('');
       this.isAuthenticated = false;
+      
+      // Clear saved token
+      this.clearSavedToken();
+      
       console.log('User signed out successfully');
     }
   }
 
   async listRecipes() {
-    await this.ensureRecipeFolder();
+    if (!this.recipeFolderId) {
+      throw new Error('No recipe folder selected. Please select a folder first.');
+    }
     
     const response = await gapi.client.drive.files.list({
       q: `'${this.recipeFolderId}' in parents and name contains '.md' and trashed=false`,
@@ -105,6 +141,160 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       lastModified: new Date(file.modifiedTime),
       size: parseInt(file.size || 0)
     }));
+  }
+
+  /**
+   * Search for a specific folder by name
+   */
+  async findFolderByName(name) {
+    const response = await gapi.client.drive.files.list({
+      q: `name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      fields: 'files(id, name, owners, shared, capabilities)'
+    });
+    
+    if (response.result.files.length > 0) {
+      const folder = response.result.files[0];
+      return {
+        id: folder.id,
+        name: folder.name,
+        isShared: folder.shared || false,
+        isOwned: folder.owners && folder.owners.some(owner => owner.me),
+        canEdit: folder.capabilities && folder.capabilities.canEdit
+      };
+    }
+    return null;
+  }
+
+  /**
+   * Verify a specific folder exists and is accessible
+   */
+  async verifyFolder(folderId) {
+    try {
+      const response = await gapi.client.drive.files.get({
+        fileId: folderId,
+        fields: 'id, name, owners, shared, capabilities'
+      });
+      
+      const folder = response.result;
+      return {
+        id: folder.id,
+        name: folder.name,
+        isShared: folder.shared || false,
+        isOwned: folder.owners && folder.owners.some(owner => owner.me),
+        canEdit: folder.capabilities && folder.capabilities.canEdit
+      };
+    } catch (error) {
+      console.log('Folder verification failed:', error);
+      return null;
+    }
+  }
+
+  /**
+   * List available folders using hybrid approach:
+   * 1. Check for previously selected folder
+   * 2. Search for "RecipeBox" folder
+   * 3. Show simplified folder list or creation options
+   */
+  async listAvailableFolders() {
+    const folders = [];
+    
+    // 1. Check for previously selected folder
+    const savedFolderId = localStorage.getItem('selectedRecipeFolderId');
+    if (savedFolderId) {
+      const previousFolder = await this.verifyFolder(savedFolderId);
+      if (previousFolder) {
+        folders.push({ ...previousFolder, isPrevious: true });
+      } else {
+        // Clean up invalid saved folder ID
+        localStorage.removeItem('selectedRecipeFolderId');
+      }
+    }
+    
+    // 2. Search for RecipeBox folder (if not already found as previous)
+    const recipeBoxFolder = await this.findFolderByName('RecipeBox');
+    if (recipeBoxFolder && !folders.find(f => f.id === recipeBoxFolder.id)) {
+      folders.push({ ...recipeBoxFolder, isRecipeBox: true });
+    }
+    
+    // 3. If we found folders, return them for immediate selection
+    // Otherwise, return empty array to trigger folder creation/selection UI
+    return folders;
+  }
+
+  /**
+   * Set the active recipe folder
+   */
+  async selectFolder(folderId) {
+    this.recipeFolderId = folderId;
+    // Store the selected folder for future use
+    await this.storeFolderSelection(folderId);
+  }
+
+  /**
+   * Create a new recipe folder
+   */
+  async createRecipeFolder(name = 'RecipeBox') {
+    const folderResponse = await gapi.client.drive.files.create({
+      resource: {
+        name: name,
+        mimeType: 'application/vnd.google-apps.folder'
+      },
+      fields: 'id'
+    });
+    
+    const folderId = folderResponse.result.id;
+    await this.selectFolder(folderId);
+    return folderId;
+  }
+
+  /**
+   * Share a folder with another user
+   */
+  async shareFolder(folderId, email, role = 'writer') {
+    try {
+      const response = await gapi.client.drive.permissions.create({
+        fileId: folderId,
+        resource: {
+          role: role,
+          type: 'user',
+          emailAddress: email
+        },
+        sendNotificationEmail: true
+      });
+      return { success: true, permissionId: response.result.id };
+    } catch (error) {
+      console.error('Error sharing folder:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Store folder selection in local storage
+   */
+  async storeFolderSelection(folderId) {
+    // We'll use a simple localStorage approach for now
+    // In a more complex app, this might go in IndexedDB
+    localStorage.setItem('selectedRecipeFolderId', folderId);
+  }
+
+  /**
+   * Restore previously selected folder
+   */
+  async restoreFolderSelection() {
+    const folderId = localStorage.getItem('selectedRecipeFolderId');
+    if (folderId) {
+      // Verify the folder still exists and is accessible
+      try {
+        await gapi.client.drive.files.get({ fileId: folderId });
+        this.recipeFolderId = folderId;
+        return folderId;
+      } catch (error) {
+        console.log('Previously selected folder no longer accessible:', error);
+        localStorage.removeItem('selectedRecipeFolderId');
+        return null;
+      }
+    }
+    return null;
   }
 
   async getRecipe(id) {
@@ -147,7 +337,7 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     form.append('file', new Blob([content], { type: 'text/markdown' }));
 
     let response;
-    const token = gapi.auth.getToken();
+    const token = gapi.client.getToken();
     
     if (existing.result.files.length > 0) {
       // Update existing
@@ -203,30 +393,17 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     };
   }
 
-  // Helper methods
+  // Helper methods - kept for backward compatibility
   async ensureRecipeFolder() {
     if (this.recipeFolderId) return;
+    
+    // Try to restore previously selected folder first
+    const restoredFolder = await this.restoreFolderSelection();
+    if (restoredFolder) return;
 
-    // Search for existing folder
-    const response = await gapi.client.drive.files.list({
-      q: "name='RecipeBox' and mimeType='application/vnd.google-apps.folder' and trashed=false",
-      fields: 'files(id)',
-      spaces: 'drive'
-    });
-
-    if (response.result.files.length > 0) {
-      this.recipeFolderId = response.result.files[0].id;
-    } else {
-      // Create new folder
-      const folderResponse = await gapi.client.drive.files.create({
-        resource: {
-          name: 'RecipeBox',
-          mimeType: 'application/vnd.google-apps.folder'
-        },
-        fields: 'id'
-      });
-      this.recipeFolderId = folderResponse.result.id;
-    }
+    // If no folder selected, we'll need the user to choose one
+    // This will be handled by the UI now
+    throw new Error('No recipe folder selected. Please select a folder first.');
   }
 
   loadScript(src) {
@@ -241,6 +418,53 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       script.onerror = reject;
       document.head.appendChild(script);
     });
+  }
+
+  // Token persistence methods
+  saveToken() {
+    const token = gapi.client.getToken();
+    if (token) {
+      // Store token with expiry time
+      const tokenData = {
+        access_token: token.access_token,
+        expires_at: Date.now() + (token.expires_in * 1000)
+      };
+      // Use localStorage for better persistence across browser sessions
+      localStorage.setItem('google_drive_token', JSON.stringify(tokenData));
+    }
+  }
+
+  getSavedToken() {
+    try {
+      // Check both localStorage and sessionStorage for backward compatibility
+      const savedData = localStorage.getItem('google_drive_token') || 
+                       sessionStorage.getItem('google_drive_token');
+      if (!savedData) return null;
+      
+      const tokenData = JSON.parse(savedData);
+      
+      // Check if token is expired
+      if (Date.now() >= tokenData.expires_at) {
+        localStorage.removeItem('google_drive_token');
+        sessionStorage.removeItem('google_drive_token');
+        return null;
+      }
+      
+      // Migrate from sessionStorage to localStorage if needed
+      if (!localStorage.getItem('google_drive_token') && sessionStorage.getItem('google_drive_token')) {
+        localStorage.setItem('google_drive_token', savedData);
+      }
+      
+      return { access_token: tokenData.access_token };
+    } catch (error) {
+      console.error('Error retrieving saved token:', error);
+      return null;
+    }
+  }
+
+  clearSavedToken() {
+    localStorage.removeItem('google_drive_token');
+    sessionStorage.removeItem('google_drive_token');
   }
 }
 

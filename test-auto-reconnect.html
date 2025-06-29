@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Test Auto-Reconnect</title>
+<style>
+  body {
+    font-family: system-ui, sans-serif;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+  }
+  .test-section {
+    margin: 2rem 0;
+    padding: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+  }
+  .log {
+    background: #f5f5f5;
+    padding: 1rem;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+  button {
+    padding: 0.5rem 1rem;
+    margin: 0.25rem;
+    border: none;
+    border-radius: 4px;
+    background: #007bff;
+    color: white;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #0056b3;
+  }
+  button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+  }
+  .status {
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin: 0.5rem 0;
+  }
+  .status.success {
+    background: #d4edda;
+    color: #155724;
+  }
+  .status.error {
+    background: #f8d7da;
+    color: #721c24;
+  }
+</style>
+</head>
+<body>
+<h1>Test Auto-Reconnect Feature</h1>
+
+<div class="test-section">
+  <h2>Token Storage Test</h2>
+  <p>Check what tokens are currently stored:</p>
+  <button onclick="checkStoredTokens()">Check Stored Tokens</button>
+  <button onclick="clearAllTokens()">Clear All Tokens</button>
+  <button onclick="simulateExpiredToken()">Simulate Expired Token</button>
+  <div id="token-status" class="status"></div>
+</div>
+
+<div class="test-section">
+  <h2>Auto-Reconnect Test</h2>
+  <p>Test the automatic reconnection flow:</p>
+  <ol>
+    <li>First, connect normally through the main app</li>
+    <li>Close the browser/tab</li>
+    <li>Open the app again - it should auto-reconnect</li>
+  </ol>
+  <button onclick="simulateAppRestart()">Simulate App Restart</button>
+  <div id="reconnect-status" class="status"></div>
+</div>
+
+<div class="test-section">
+  <h2>Debug Log</h2>
+  <div id="log" class="log"></div>
+</div>
+
+<script>
+  const log = (message) => {
+    const logDiv = document.getElementById('log');
+    const timestamp = new Date().toLocaleTimeString();
+    logDiv.innerHTML += `[${timestamp}] ${message}<br>`;
+    logDiv.scrollTop = logDiv.scrollHeight;
+  };
+
+  function checkStoredTokens() {
+    const tokenStatus = document.getElementById('token-status');
+    tokenStatus.className = 'status';
+    
+    try {
+      const localStorage_token = localStorage.getItem('google_drive_token');
+      const sessionStorage_token = sessionStorage.getItem('google_drive_token');
+      const recipeFolderId = localStorage.getItem('selectedRecipeFolderId');
+      
+      let html = '<strong>Token Storage Status:</strong><br>';
+      
+      if (localStorage_token) {
+        const tokenData = JSON.parse(localStorage_token);
+        const expiresAt = new Date(tokenData.expires_at);
+        const isExpired = Date.now() >= tokenData.expires_at;
+        html += `✅ localStorage token found<br>`;
+        html += `&nbsp;&nbsp;- Expires: ${expiresAt.toLocaleString()}<br>`;
+        html += `&nbsp;&nbsp;- Status: ${isExpired ? '❌ EXPIRED' : '✅ VALID'}<br>`;
+        log(`localStorage token: ${isExpired ? 'EXPIRED' : 'VALID'}`);
+      } else {
+        html += `❌ No localStorage token<br>`;
+        log('No localStorage token found');
+      }
+      
+      if (sessionStorage_token) {
+        html += `⚠️ sessionStorage token found (legacy)<br>`;
+        log('Found legacy sessionStorage token');
+      }
+      
+      if (recipeFolderId) {
+        html += `✅ Recipe folder selected: ${recipeFolderId}<br>`;
+        log(`Recipe folder ID: ${recipeFolderId}`);
+      } else {
+        html += `❌ No recipe folder selected<br>`;
+        log('No recipe folder selected');
+      }
+      
+      tokenStatus.innerHTML = html;
+      tokenStatus.className = 'status success';
+    } catch (error) {
+      tokenStatus.innerHTML = `Error: ${error.message}`;
+      tokenStatus.className = 'status error';
+      log(`Error checking tokens: ${error.message}`);
+    }
+  }
+
+  function clearAllTokens() {
+    try {
+      localStorage.removeItem('google_drive_token');
+      sessionStorage.removeItem('google_drive_token');
+      localStorage.removeItem('selectedRecipeFolderId');
+      
+      const tokenStatus = document.getElementById('token-status');
+      tokenStatus.innerHTML = '✅ All tokens cleared';
+      tokenStatus.className = 'status success';
+      log('All tokens cleared');
+    } catch (error) {
+      log(`Error clearing tokens: ${error.message}`);
+    }
+  }
+
+  function simulateExpiredToken() {
+    try {
+      // Create a token that expired 1 hour ago
+      const expiredToken = {
+        access_token: 'fake_expired_token',
+        expires_at: Date.now() - (60 * 60 * 1000) // 1 hour ago
+      };
+      localStorage.setItem('google_drive_token', JSON.stringify(expiredToken));
+      
+      const tokenStatus = document.getElementById('token-status');
+      tokenStatus.innerHTML = '✅ Created expired token for testing';
+      tokenStatus.className = 'status success';
+      log('Created expired token');
+    } catch (error) {
+      log(`Error creating expired token: ${error.message}`);
+    }
+  }
+
+  async function simulateAppRestart() {
+    const reconnectStatus = document.getElementById('reconnect-status');
+    reconnectStatus.className = 'status';
+    
+    try {
+      log('Simulating app restart...');
+      
+      // Check what we have in storage
+      const hasToken = localStorage.getItem('google_drive_token') !== null;
+      const hasFolder = localStorage.getItem('selectedRecipeFolderId') !== null;
+      
+      log(`Pre-restart state: Token=${hasToken}, Folder=${hasFolder}`);
+      
+      if (!hasToken) {
+        reconnectStatus.innerHTML = '⚠️ No saved token - need to authenticate first';
+        reconnectStatus.className = 'status error';
+        return;
+      }
+      
+      // Open the main app in a new tab to test auto-reconnect
+      reconnectStatus.innerHTML = '✅ Opening app in new tab - check if it auto-reconnects';
+      reconnectStatus.className = 'status success';
+      window.open('index.html', '_blank');
+      
+    } catch (error) {
+      reconnectStatus.innerHTML = `Error: ${error.message}`;
+      reconnectStatus.className = 'status error';
+      log(`Error: ${error.message}`);
+    }
+  }
+
+  // Initial check on page load
+  window.addEventListener('load', () => {
+    log('Test page loaded');
+    checkStoredTokens();
+  });
+</script>
+</body>
+</html>

@@ -129,6 +129,70 @@
     border-radius: 4px;
     font-size: 14px;
   }
+  .folder-selection {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+  }
+  .folder-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 0.5rem 0;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: white;
+  }
+  .folder-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    margin: 0.25rem 0;
+    cursor: pointer;
+  }
+  .folder-item:hover {
+    background: #f8f9fa;
+  }
+  .folder-item.selected {
+    background: #d1ecf1;
+    border-color: #bee5eb;
+  }
+  .folder-info {
+    flex: 1;
+  }
+  .folder-badges {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .folder-badge {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.7rem;
+    border-radius: 2px;
+    color: white;
+  }
+  .folder-badge.shared {
+    background: #28a745;
+  }
+  .folder-badge.owned {
+    background: #007bff;
+  }
+  .share-form {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+  }
+  .share-form input {
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    margin-right: 0.5rem;
+    width: 200px;
+  }
 </style>
 </head>
 <body>
@@ -148,6 +212,30 @@
     </div>
     <div class="sync-progress hidden" id="sync-progress">
       <div id="sync-progress-text">Ready to sync</div>
+    </div>
+    
+    <!-- Folder Selection UI -->
+    <div class="folder-selection hidden" id="folder-selection">
+      <h3>Select Recipe Folder</h3>
+      <p>Choose a folder to store your recipes. You can select an existing shared folder or create a new one.</p>
+      
+      <div class="sync-buttons">
+        <button id="refresh-folders-btn">Refresh Folders</button>
+        <button id="create-folder-btn">Create New Folder</button>
+        <button id="select-folder-btn" disabled>Use Selected Folder</button>
+      </div>
+      
+      <div class="folder-list" id="folder-list">
+        <div>Loading folders...</div>
+      </div>
+      
+      <div class="share-form hidden" id="share-form">
+        <h4>Share Selected Folder</h4>
+        <p>Share this folder with your partner so you can both access the same recipes.</p>
+        <input type="email" id="share-email" placeholder="partner@example.com">
+        <button id="share-folder-btn">Share Folder</button>
+        <div id="share-result"></div>
+      </div>
     </div>
   </div>
   
@@ -366,6 +454,47 @@
       if (success) {
         syncEnabled = true;
         console.log('Sync initialized successfully');
+        
+        // Check if we're already authenticated (from saved token)
+        const isAuth = await syncManager.isAuthenticated();
+        console.log('Authentication status after init:', isAuth);
+        
+        if (isAuth) {
+          // We have a valid saved token - update UI to show connected state
+          console.log('Found valid saved authentication');
+          
+          // Try to restore previously selected folder
+          const restoredFolder = await syncManager.provider.restoreFolderSelection();
+          if (restoredFolder) {
+            console.log('Restored folder selection:', restoredFolder);
+            
+            // Update UI to show connected state
+            await updateSyncStatus();
+            
+            // Automatically sync if we have both auth and folder
+            syncStatusText.textContent = 'Connected - Starting automatic sync...';
+            
+            try {
+              // Perform sync
+              await performSync();
+              console.log('Automatic sync completed successfully');
+            } catch (syncError) {
+              console.error('Automatic sync failed:', syncError);
+              syncStatusText.textContent = `Connected - Sync failed: ${syncError.message}`;
+            }
+          } else {
+            // Authenticated but no folder selected
+            console.log('Authenticated but no folder selected');
+            await updateSyncStatus();
+            syncStatusText.textContent = 'Connected - Please select a recipe folder';
+            // Show folder selection UI
+            await showFolderSelection();
+          }
+        } else {
+          // Not authenticated - show default disconnected state
+          console.log('No valid saved authentication found');
+          await updateSyncStatus();
+        }
       } else {
         console.log('Sync initialization failed');
       }
@@ -375,8 +504,6 @@
       document.querySelector('.sync-panel').style.display = 'none';
       return;
     }
-    
-    await updateSyncStatus();
   }
 
   async function connectToSync() {
@@ -386,8 +513,15 @@
     const result = await syncManager.authenticate();
     if (result.success) {
       await updateSyncStatus();
-      // Try to sync immediately after connecting
-      await performSync();
+      
+      // Check if we have a folder selected
+      if (!syncManager.provider.recipeFolderId) {
+        syncStatusText.textContent = 'Connected - Please select a recipe folder';
+        await showFolderSelection();
+      } else {
+        // Try to sync immediately after connecting
+        await performSync();
+      }
     } else {
       syncStatusText.textContent = `Connection failed: ${result.error}`;
       syncConnectBtn.disabled = false;
@@ -397,6 +531,13 @@
   async function performSync() {
     if (!await syncManager.isAuthenticated()) {
       await connectToSync();
+      return;
+    }
+    
+    // Check if we have a folder selected
+    if (!syncManager.provider.recipeFolderId) {
+      syncStatusText.textContent = 'Please select a recipe folder first';
+      await showFolderSelection();
       return;
     }
     
@@ -492,6 +633,242 @@
     }
   });
   
+  // Folder selection UI references
+  const folderSelection = document.getElementById('folder-selection');
+  const folderList = document.getElementById('folder-list');
+  const refreshFoldersBtn = document.getElementById('refresh-folders-btn');
+  const createFolderBtn = document.getElementById('create-folder-btn');
+  const selectFolderBtn = document.getElementById('select-folder-btn');
+  const shareForm = document.getElementById('share-form');
+  const shareEmailInput = document.getElementById('share-email');
+  const shareFolderBtn = document.getElementById('share-folder-btn');
+  const shareResult = document.getElementById('share-result');
+
+  let selectedFolderId = null;
+
+  // Folder selection functions
+  async function showFolderSelection() {
+    folderSelection.classList.remove('hidden');
+    await loadAvailableFolders();
+  }
+
+  async function hideFolderSelection() {
+    folderSelection.classList.add('hidden');
+    shareForm.classList.add('hidden');
+  }
+
+  async function loadAvailableFolders() {
+    folderList.innerHTML = '<div>Loading folders...</div>';
+    
+    try {
+      const folders = await syncManager.provider.listAvailableFolders();
+      folderList.innerHTML = '';
+      
+      if (folders.length === 0) {
+        folderList.innerHTML = '<div><em>No folders found. Create a new one below.</em></div>';
+        return;
+      }
+      
+      console.log('Folder selection debug:', {
+        totalFolders: folders.length,
+        folders: folders.map(f => ({
+          name: f.name,
+          id: f.id,
+          isPrevious: f.isPrevious,
+          isRecipeBox: f.isRecipeBox
+        }))
+      });
+      
+      // Determine which folder to auto-select
+      let folderToAutoSelect = null;
+      
+      // Priority 1: Previously selected folder
+      const previousFolder = folders.find(f => f.isPrevious);
+      if (previousFolder) {
+        folderToAutoSelect = previousFolder;
+      }
+      // Priority 2: RecipeBox folder (if no previous selection)
+      else {
+        const recipeBoxFolder = folders.find(f => f.isRecipeBox);
+        if (recipeBoxFolder) {
+          folderToAutoSelect = recipeBoxFolder;
+        }
+      }
+      
+      // Sort folders: Previous first, then RecipeBox, then alphabetically
+      const sortedFolders = [...folders].sort((a, b) => {
+        if (a.isPrevious) return -1;
+        if (b.isPrevious) return 1;
+        if (a.isRecipeBox) return -1;
+        if (b.isRecipeBox) return 1;
+        return a.name.localeCompare(b.name);
+      });
+      
+      for (const folder of sortedFolders) {
+        const folderDiv = document.createElement('div');
+        folderDiv.className = 'folder-item';
+        folderDiv.dataset.folderId = folder.id;
+        
+        // Auto-select the determined folder
+        const shouldAutoSelect = folderToAutoSelect && folder.id === folderToAutoSelect.id;
+        if (shouldAutoSelect) {
+          folderDiv.classList.add('selected');
+          selectedFolderId = folder.id;
+          selectFolderBtn.disabled = false;
+          shareForm.classList.remove('hidden');
+        }
+        
+        // Determine the label and badges
+        let label = folder.name;
+        let badges = [];
+        
+        // Ownership/sharing badges
+        if (folder.isOwned) {
+          badges.push('<span class="folder-badge owned">Owned</span>');
+        }
+        if (folder.isShared) {
+          badges.push('<span class="folder-badge shared">Shared</span>');
+        }
+        
+        // Special status badges
+        if (folder.isPrevious && folder.isRecipeBox) {
+          label += ' (Current)';
+          badges.push('<span class="folder-badge" style="background: #17a2b8;">Current</span>');
+        } else if (folder.isPrevious) {
+          label += ' (Previously Selected)';
+          badges.push('<span class="folder-badge" style="background: #17a2b8;">Previous</span>');
+        } else if (folder.isRecipeBox) {
+          label += ' (Recommended)';
+          badges.push('<span class="folder-badge" style="background: #28a745;">Recommended</span>');
+        }
+        
+        folderDiv.innerHTML = `
+          <div class="folder-info">
+            <strong>${label}</strong>
+            <div class="folder-badges">
+              ${badges.filter(badge => badge).join('')}
+            </div>
+          </div>
+        `;
+        
+        folderDiv.addEventListener('click', () => selectFolder(folder.id, folderDiv));
+        folderList.appendChild(folderDiv);
+      }
+      
+      // If we auto-selected a folder, log it
+      if (folderToAutoSelect) {
+        console.log('Auto-selected folder:', folderToAutoSelect.name, folderToAutoSelect.id);
+      }
+    } catch (error) {
+      folderList.innerHTML = `<div style="color: red;">Error loading folders: ${error.message}</div>`;
+    }
+  }
+
+  function selectFolder(folderId, folderElement) {
+    // Clear previous selection
+    document.querySelectorAll('.folder-item').forEach(item => {
+      item.classList.remove('selected');
+    });
+    
+    // Select new folder
+    folderElement.classList.add('selected');
+    selectedFolderId = folderId;
+    
+    // Enable the select button
+    selectFolderBtn.disabled = false;
+    
+    // Show share form
+    shareForm.classList.remove('hidden');
+  }
+
+  async function createNewFolder() {
+    const folderName = prompt('Enter folder name:', 'RecipeBox');
+    if (!folderName) return;
+    
+    try {
+      createFolderBtn.disabled = true;
+      createFolderBtn.textContent = 'Creating...';
+      
+      const folderId = await syncManager.provider.createRecipeFolder(folderName);
+      
+      // Refresh folder list and select the new folder
+      await loadAvailableFolders();
+      
+      // Find and select the newly created folder
+      const folderElements = document.querySelectorAll('.folder-item');
+      for (const element of folderElements) {
+        if (element.dataset.folderId === folderId) {
+          selectFolder(folderId, element);
+          break;
+        }
+      }
+      
+      alert(`Folder "${folderName}" created successfully!`);
+    } catch (error) {
+      alert(`Failed to create folder: ${error.message}`);
+    } finally {
+      createFolderBtn.disabled = false;
+      createFolderBtn.textContent = 'Create New Folder';
+    }
+  }
+
+  async function shareSelectedFolder() {
+    if (!selectedFolderId) {
+      alert('Please select a folder first');
+      return;
+    }
+    
+    const email = shareEmailInput.value.trim();
+    if (!email) {
+      alert('Please enter an email address');
+      return;
+    }
+    
+    try {
+      shareFolderBtn.disabled = true;
+      shareFolderBtn.textContent = 'Sharing...';
+      shareResult.innerHTML = '';
+      
+      const result = await syncManager.provider.shareFolder(selectedFolderId, email);
+      
+      if (result.success) {
+        shareResult.innerHTML = '<div style="color: green;">✓ Folder shared successfully!</div>';
+        shareEmailInput.value = '';
+      } else {
+        shareResult.innerHTML = `<div style="color: red;">✗ Failed to share: ${result.error}</div>`;
+      }
+    } catch (error) {
+      shareResult.innerHTML = `<div style="color: red;">✗ Error: ${error.message}</div>`;
+    } finally {
+      shareFolderBtn.disabled = false;
+      shareFolderBtn.textContent = 'Share Folder';
+    }
+  }
+
+  async function finalizeFolderSelection() {
+    if (!selectedFolderId) {
+      alert('Please select a folder first');
+      return;
+    }
+    
+    try {
+      await syncManager.provider.selectFolder(selectedFolderId);
+      await hideFolderSelection();
+      await updateSyncStatus();
+      
+      // Try to sync after folder selection
+      await performSync();
+    } catch (error) {
+      alert(`Error selecting folder: ${error.message}`);
+    }
+  }
+
+  // Folder selection event handlers
+  refreshFoldersBtn.addEventListener('click', loadAvailableFolders);
+  createFolderBtn.addEventListener('click', createNewFolder);
+  selectFolderBtn.addEventListener('click', finalizeFolderSelection);
+  shareFolderBtn.addEventListener('click', shareSelectedFolder);
+
   // Sync event handlers
   syncConnectBtn.addEventListener('click', connectToSync);
   syncNowBtn.addEventListener('click', performSync);
