@@ -412,7 +412,7 @@
   // Routing: react to hash
   const route = () => {
     const match = location.hash.match(/recipe=([\w-]+)/);
-    if (match && dirHandle) renderRecipe(match[1]);
+    if (match) renderRecipe(match[1]);
   };
   window.addEventListener('hashchange', route);
 
