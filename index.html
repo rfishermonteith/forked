@@ -44,6 +44,23 @@
     display: block;
     margin: 1rem 0;
   }
+  
+  /* Recipe image styling */
+  .recipe-image {
+    width: 100%;
+    max-width: 600px;
+    height: auto;
+    object-fit: contain;
+    border-radius: 8px;
+    margin: 0 auto 2rem auto;
+    display: block;
+  }
+  
+  @media (max-width: 768px) {
+    .recipe-image {
+      max-width: 100%;
+    }
+  }
   .pick {
     margin: 1.5rem 0;
   }
@@ -393,6 +410,7 @@
   // Global state
   let dirHandle = null;
   const slugToFile = new Map();
+  const slugToImage = new Map(); // Map for recipe images
   
   // Sync manager
   const syncManager = new SyncManager();
@@ -445,11 +463,23 @@
   const renderIndex = async () => {
     recipeListDiv.innerHTML = '';
     slugToFile.clear();
+    slugToImage.clear();
     
     // First priority: Try to load from synced recipes (IndexedDB)
     const syncedRecipes = await get('recipeData') || [];
+    const syncedImages = await get('imageData') || [];
+    
     if (syncedRecipes.length > 0) {
       console.log(`Loading ${syncedRecipes.length} synced recipes`);
+      
+      // Create a map of images by base name for quick lookup
+      const imageMap = new Map();
+      for (const image of syncedImages) {
+        const baseName = image.name.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+        const slug = slugify(baseName);
+        imageMap.set(slug, image);
+      }
+      
       for (const recipe of syncedRecipes) {
         const slug = slugify(recipe.name.replace(/\.md$/, ''));
         // Create a File-like object from synced data
@@ -458,6 +488,12 @@
           lastModified: recipe.lastModified
         });
         slugToFile.set(slug, file);
+        
+        // Check if there's a matching image in synced images
+        if (imageMap.has(slug)) {
+          slugToImage.set(slug, imageMap.get(slug));
+        }
+        
         const recipeItem = document.createElement('div');
         recipeItem.className = 'recipe-item';
         recipeItem.innerHTML = `${recipe.name.replace(/\.md$/, '')} <span style="color: #28a745;">☁️</span>`;
@@ -481,13 +517,31 @@
     
     if (Array.isArray(dirHandle)) {
       // Fallback mode: array of files
+      // First pass: collect all image files
+      const imageFiles = new Map();
+      for (const file of dirHandle) {
+        if (file.name.match(/\.(jpg|jpeg|png|webp)$/i)) {
+          const baseName = file.name.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+          const slug = slugify(baseName);
+          imageFiles.set(slug, file);
+        }
+      }
+      
+      // Second pass: process recipe files and match with images
       for (const file of dirHandle) {
         if (file.name.endsWith('.md')) {
-          const slug = slugify(file.name.replace(/\.md$/, ''));
+          const baseName = file.name.replace(/\.md$/, '');
+          const slug = slugify(baseName);
           slugToFile.set(slug, file);
+          
+          // Check if there's a matching image
+          if (imageFiles.has(slug)) {
+            slugToImage.set(slug, imageFiles.get(slug));
+          }
+          
           const recipeItem = document.createElement('div');
           recipeItem.className = 'recipe-item';
-          recipeItem.innerHTML = `${file.name.replace(/\.md$/, '')} <span style="color: #6c757d;">📁</span>`;
+          recipeItem.innerHTML = `${baseName} <span style="color: #6c757d;">📁</span>`;
           recipeItem.addEventListener('click', () => {
             window.location.hash = `#recipe=${slug}`;
             document.getElementById('recipes-menu').classList.remove('show');
@@ -497,13 +551,31 @@
       }
     } else {
       // Modern mode: directory handle
+      // First pass: collect all image files
+      const imageEntries = new Map();
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'file' && entry.name.match(/\.(jpg|jpeg|png|webp)$/i)) {
+          const baseName = entry.name.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+          const slug = slugify(baseName);
+          imageEntries.set(slug, entry);
+        }
+      }
+      
+      // Second pass: process recipe files and match with images
       for await (const entry of dirHandle.values()) {
         if (entry.kind === 'file' && entry.name.endsWith('.md')) {
-          const slug = slugify(entry.name.replace(/\.md$/, ''));
+          const baseName = entry.name.replace(/\.md$/, '');
+          const slug = slugify(baseName);
           slugToFile.set(slug, entry);
+          
+          // Check if there's a matching image
+          if (imageEntries.has(slug)) {
+            slugToImage.set(slug, imageEntries.get(slug));
+          }
+          
           const recipeItem = document.createElement('div');
           recipeItem.className = 'recipe-item';
-          recipeItem.innerHTML = `${entry.name.replace(/\.md$/, '')} <span style="color: #6c757d;">📁</span>`;
+          recipeItem.innerHTML = `${baseName} <span style="color: #6c757d;">📁</span>`;
           recipeItem.addEventListener('click', () => {
             window.location.hash = `#recipe=${slug}`;
             document.getElementById('recipes-menu').classList.remove('show');
@@ -528,10 +600,39 @@
     let html = md.render(content);
     html = DOMPurify.sanitize(html);
 
+    // Determine image source: frontmatter takes precedence, then check slugToImage map
+    let imageHtml = '';
+    if (fm.image) {
+      imageHtml = `<img src="${fm.image}" alt="" class="recipe-image">`;
+    } else if (slugToImage.has(slug)) {
+      // Get the image from the map
+      const imageEntry = slugToImage.get(slug);
+      if (imageEntry) {
+        try {
+          // Handle different types of image sources
+          if (imageEntry.dataUrl) {
+            // Synced image with data URL
+            imageHtml = `<img src="${imageEntry.dataUrl}" alt="" class="recipe-image">`;
+          } else if (imageEntry.getFile) {
+            // FileSystemFileHandle
+            const imageFile = await imageEntry.getFile();
+            const imageUrl = URL.createObjectURL(imageFile);
+            imageHtml = `<img src="${imageUrl}" alt="" class="recipe-image">`;
+          } else {
+            // File object
+            const imageUrl = URL.createObjectURL(imageEntry);
+            imageHtml = `<img src="${imageUrl}" alt="" class="recipe-image">`;
+          }
+        } catch (error) {
+          console.error('Error loading image:', error);
+        }
+      }
+    }
+
     // Inject into DOM
     viewer.innerHTML = `
     <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
-    ${fm.image ? `<img src="${fm.image}" alt="">` : ''}
+    ${imageHtml}
     ${Array.isArray(fm.ingredients) ? `
       <h2>What you'll need</h2>
       <ul>${fm.ingredients.map(i => `<li>${DOMPurify.sanitize(i)}</li>`).join('')}</ul>` : ''}
@@ -643,8 +744,11 @@
       }
     } catch (error) {
       console.log('Sync not available:', error.message);
-      // Hide sync panel if config is missing
-      document.querySelector('.sync-panel').style.display = 'none';
+      // Hide settings dropdown if config is missing
+      const settingsDropdown = document.querySelector('.menu-dropdown:nth-child(2)');
+      if (settingsDropdown) {
+        settingsDropdown.style.display = 'none';
+      }
       return;
     }
   }

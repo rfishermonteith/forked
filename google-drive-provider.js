@@ -144,6 +144,28 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   /**
+   * List image files in the recipe folder
+   */
+  async listImages() {
+    if (!this.recipeFolderId) {
+      throw new Error('No recipe folder selected. Please select a folder first.');
+    }
+    
+    const response = await gapi.client.drive.files.list({
+      q: `'${this.recipeFolderId}' in parents and (name contains '.jpg' or name contains '.jpeg' or name contains '.png' or name contains '.webp') and trashed=false`,
+      fields: 'files(id, name, modifiedTime, size)',
+      orderBy: 'modifiedTime desc'
+    });
+
+    return response.result.files.map(file => ({
+      id: file.id,
+      name: file.name,
+      lastModified: new Date(file.modifiedTime),
+      size: parseInt(file.size || 0)
+    }));
+  }
+
+  /**
    * Search for a specific folder by name
    */
   async findFolderByName(name) {
@@ -318,6 +340,42 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     };
   }
 
+  /**
+   * Get image file as data URL
+   */
+  async getImage(id) {
+    // Get metadata
+    const metaResponse = await gapi.client.drive.files.get({
+      fileId: id,
+      fields: 'name, modifiedTime, mimeType'
+    });
+
+    // Get binary content
+    const token = gapi.client.getToken();
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${id}?alt=media`,
+      {
+        headers: { 'Authorization': `Bearer ${token.access_token}` }
+      }
+    );
+
+    const blob = await response.blob();
+    const reader = new FileReader();
+    
+    return new Promise((resolve) => {
+      reader.onloadend = () => {
+        resolve({
+          id: id,
+          name: metaResponse.result.name,
+          dataUrl: reader.result,
+          mimeType: metaResponse.result.mimeType,
+          lastModified: new Date(metaResponse.result.modifiedTime)
+        });
+      };
+      reader.readAsDataURL(blob);
+    });
+  }
+
   async saveRecipe(name, content) {
     await this.ensureRecipeFolder();
 
@@ -365,6 +423,62 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     const result = await response.json();
     this.lastSync = new Date();
     return { id: result.id, success: response.ok };
+  }
+
+  /**
+   * Save image file to Google Drive
+   */
+  async saveImage(name, dataUrl) {
+    await this.ensureRecipeFolder();
+
+    // Convert data URL to blob
+    const response = await fetch(dataUrl);
+    const blob = await response.blob();
+
+    // Check if file exists
+    const existing = await gapi.client.drive.files.list({
+      q: `'${this.recipeFolderId}' in parents and name='${name}' and trashed=false`,
+      fields: 'files(id)'
+    });
+
+    const metadata = {
+      name: name,
+      parents: existing.result.files.length === 0 ? [this.recipeFolderId] : undefined
+    };
+
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', blob);
+
+    let uploadResponse;
+    const token = gapi.client.getToken();
+    
+    if (existing.result.files.length > 0) {
+      // Update existing
+      const fileId = existing.result.files[0].id;
+      uploadResponse = await fetch(
+        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`,
+        {
+          method: 'PATCH',
+          headers: { 'Authorization': `Bearer ${token.access_token}` },
+          body: form
+        }
+      );
+    } else {
+      // Create new
+      uploadResponse = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token.access_token}` },
+          body: form
+        }
+      );
+    }
+
+    const result = await uploadResponse.json();
+    this.lastSync = new Date();
+    return { id: result.id, success: uploadResponse.ok };
   }
 
   async deleteRecipe(id) {
