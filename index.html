@@ -18,9 +18,11 @@
   header {
     margin: 2rem 0 1rem;
   }
-  ul {
-    list-style: none;
-    padding-left: 0;
+  /* Recipe content lists - with bullets */
+  #viewer ul {
+    list-style: disc;
+    padding-left: 1.5rem;
+    margin: 1rem 0;
   }
   li {
     margin: .25rem 0;
@@ -193,6 +195,98 @@
     margin-right: 0.5rem;
     width: 200px;
   }
+  
+  /* Minimalist Menu Bar */
+  .menu-bar {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid #dee2e6;
+    margin-bottom: 2rem;
+  }
+  
+  .menu-dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .menu-button {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 14px;
+  }
+  
+  .menu-button:hover {
+    background: #e9ecef;
+  }
+  
+  .menu-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 1000;
+    min-width: 250px;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  
+  .menu-content.show {
+    display: block;
+  }
+  
+  .menu-section {
+    padding: 1rem;
+    border-bottom: 1px solid #f8f9fa;
+  }
+  
+  .menu-section:last-child {
+    border-bottom: none;
+  }
+  
+  .menu-section h4 {
+    margin: 0 0 0.5rem 0;
+    font-size: 14px;
+    color: #6c757d;
+  }
+  
+  .debug-link {
+    background: none;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0.5rem;
+  }
+  
+  .debug-link:hover {
+    color: #495057;
+  }
+  
+  .recipe-item {
+    padding: 0.5rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f8f9fa;
+  }
+  
+  .recipe-item:hover {
+    background: #f8f9fa;
+  }
+  
+  .recipe-item:last-child {
+    border-bottom: none;
+  }
 </style>
 </head>
 <body>
@@ -200,48 +294,79 @@
   <span>Install Recipe Box for easy access</span>
   <button id="install-btn">Install</button>
 </div>
-<header>
-  <div class="sync-panel">
-    <div class="sync-status disconnected" id="sync-status">
-      <span id="sync-status-text">Not connected to cloud storage</span>
-    </div>
-    <div class="sync-buttons">
-      <button id="sync-connect-btn">Connect to Google Drive</button>
-      <button id="sync-now-btn" disabled>Sync Now</button>
-      <button id="sync-disconnect-btn" disabled>Disconnect</button>
-    </div>
-    <div class="sync-progress hidden" id="sync-progress">
-      <div id="sync-progress-text">Ready to sync</div>
-    </div>
-    
-    <!-- Folder Selection UI -->
-    <div class="folder-selection hidden" id="folder-selection">
-      <h3>Select Recipe Folder</h3>
-      <p>Choose a folder to store your recipes. You can select an existing shared folder or create a new one.</p>
-      
-      <div class="sync-buttons">
-        <button id="refresh-folders-btn">Refresh Folders</button>
-        <button id="create-folder-btn">Create New Folder</button>
-        <button id="select-folder-btn" disabled>Use Selected Folder</button>
-      </div>
-      
-      <div class="folder-list" id="folder-list">
-        <div>Loading folders...</div>
-      </div>
-      
-      <div class="share-form hidden" id="share-form">
-        <h4>Share Selected Folder</h4>
-        <p>Share this folder with your partner so you can both access the same recipes.</p>
-        <input type="email" id="share-email" placeholder="partner@example.com">
-        <button id="share-folder-btn">Share Folder</button>
-        <div id="share-result"></div>
+<!-- Minimalist Menu Bar -->
+<nav class="menu-bar">
+  <!-- Recipes Dropdown -->
+  <div class="menu-dropdown">
+    <button class="menu-button" id="recipes-menu-btn">
+      ≡ Recipes ▼
+    </button>
+    <div class="menu-content" id="recipes-menu">
+      <div class="menu-section">
+        <div id="recipe-list">
+          <!-- Recipes will be populated here -->
+        </div>
       </div>
     </div>
   </div>
+
+  <!-- Settings Dropdown -->
+  <div class="menu-dropdown">
+    <button class="menu-button" id="settings-menu-btn">
+      ⚙ Settings ▼
+    </button>
+    <div class="menu-content" id="settings-menu">
+      <!-- Google Drive Sync Section -->
+      <div class="menu-section">
+        <h4>Cloud Sync</h4>
+        <div class="sync-status disconnected" id="sync-status">
+          <span id="sync-status-text">Not connected to cloud storage</span>
+        </div>
+        <div class="sync-buttons">
+          <button id="sync-connect-btn">Connect to Google Drive</button>
+          <button id="sync-now-btn" disabled>Sync Now</button>
+          <button id="sync-disconnect-btn" disabled>Disconnect</button>
+        </div>
+        <div class="sync-progress hidden" id="sync-progress">
+          <div id="sync-progress-text">Ready to sync</div>
+        </div>
+      </div>
+      
+      <!-- Local Files Section -->
+      <div class="menu-section">
+        <h4>Local Files</h4>
+        <button class="pick" id="pickDir">Open recipe folder</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Debug Link -->
+  <button class="debug-link" id="debug-toggle">🔧 Debug</button>
+</nav>
+
+<!-- Hidden Folder Selection UI (shown when needed) -->
+<div class="folder-selection hidden" id="folder-selection">
+  <h3>Select Recipe Folder</h3>
+  <p>Choose a folder to store your recipes. You can select an existing shared folder or create a new one.</p>
   
-  <button class="pick" id="pickDir">Open recipe folder (fallback)</button>
-  <ul id="index"></ul>
-</header>
+  <div class="sync-buttons">
+    <button id="refresh-folders-btn">Refresh Folders</button>
+    <button id="create-folder-btn">Create New Folder</button>
+    <button id="select-folder-btn" disabled>Use Selected Folder</button>
+  </div>
+  
+  <div class="folder-list" id="folder-list">
+    <div>Loading folders...</div>
+  </div>
+  
+  <div class="share-form hidden" id="share-form">
+    <h4>Share Selected Folder</h4>
+    <p>Share this folder with your partner so you can both access the same recipes.</p>
+    <input type="email" id="share-email" placeholder="partner@example.com">
+    <button id="share-folder-btn">Share Folder</button>
+    <div id="share-result"></div>
+  </div>
+</div>
 
 <article id="viewer"></article>
 
@@ -299,7 +424,7 @@
 
   // UI references
   const pickBtn = document.getElementById('pickDir');
-  const indexUl = document.getElementById('index');
+  const recipeListDiv = document.getElementById('recipe-list');
   const viewer = document.getElementById('viewer');
   
   // Sync UI references
@@ -318,7 +443,7 @@
       .replace(/^-+|-+$/g, '');
 
   const renderIndex = async () => {
-    indexUl.innerHTML = '';
+    recipeListDiv.innerHTML = '';
     slugToFile.clear();
     
     // First priority: Try to load from synced recipes (IndexedDB)
@@ -333,18 +458,24 @@
           lastModified: recipe.lastModified
         });
         slugToFile.set(slug, file);
-        const li = document.createElement('li');
-        li.innerHTML = `<a href="#recipe=${slug}">${recipe.name.replace(/\.md$/, '')}</a> <span style="color: #28a745;">☁️</span>`;
-        indexUl.appendChild(li);
+        const recipeItem = document.createElement('div');
+        recipeItem.className = 'recipe-item';
+        recipeItem.innerHTML = `${recipe.name.replace(/\.md$/, '')} <span style="color: #28a745;">☁️</span>`;
+        recipeItem.addEventListener('click', () => {
+          window.location.hash = `#recipe=${slug}`;
+          document.getElementById('recipes-menu').classList.remove('show');
+        });
+        recipeListDiv.appendChild(recipeItem);
       }
       return; // Exit early if we have synced recipes
     }
     
     // Fallback: Handle local directory/file selection
     if (!dirHandle) {
-      const li = document.createElement('li');
-      li.innerHTML = '<em>No recipes loaded. Connect to Google Drive above or use the fallback folder picker.</em>';
-      indexUl.appendChild(li);
+      const recipeItem = document.createElement('div');
+      recipeItem.className = 'recipe-item';
+      recipeItem.innerHTML = '<em>No recipes loaded. Connect to Google Drive above or use the fallback folder picker.</em>';
+      recipeListDiv.appendChild(recipeItem);
       return;
     }
     
@@ -354,9 +485,14 @@
         if (file.name.endsWith('.md')) {
           const slug = slugify(file.name.replace(/\.md$/, ''));
           slugToFile.set(slug, file);
-          const li = document.createElement('li');
-          li.innerHTML = `<a href="#recipe=${slug}">${file.name.replace(/\.md$/, '')}</a> <span style="color: #6c757d;">📁</span>`;
-          indexUl.appendChild(li);
+          const recipeItem = document.createElement('div');
+          recipeItem.className = 'recipe-item';
+          recipeItem.innerHTML = `${file.name.replace(/\.md$/, '')} <span style="color: #6c757d;">📁</span>`;
+          recipeItem.addEventListener('click', () => {
+            window.location.hash = `#recipe=${slug}`;
+            document.getElementById('recipes-menu').classList.remove('show');
+          });
+          recipeListDiv.appendChild(recipeItem);
         }
       }
     } else {
@@ -365,9 +501,14 @@
         if (entry.kind === 'file' && entry.name.endsWith('.md')) {
           const slug = slugify(entry.name.replace(/\.md$/, ''));
           slugToFile.set(slug, entry);
-          const li = document.createElement('li');
-          li.innerHTML = `<a href="#recipe=${slug}">${entry.name.replace(/\.md$/, '')}</a> <span style="color: #6c757d;">📁</span>`;
-          indexUl.appendChild(li);
+          const recipeItem = document.createElement('div');
+          recipeItem.className = 'recipe-item';
+          recipeItem.innerHTML = `${entry.name.replace(/\.md$/, '')} <span style="color: #6c757d;">📁</span>`;
+          recipeItem.addEventListener('click', () => {
+            window.location.hash = `#recipe=${slug}`;
+            document.getElementById('recipes-menu').classList.remove('show');
+          });
+          recipeListDiv.appendChild(recipeItem);
         }
       }
     }
@@ -412,7 +553,9 @@
   // Routing: react to hash
   const route = () => {
     const match = location.hash.match(/recipe=([\w-]+)/);
-    if (match) renderRecipe(match[1]);
+    if (match) {
+      renderRecipe(match[1]);
+    }
   };
   window.addEventListener('hashchange', route);
 
@@ -628,7 +771,6 @@
         console.log(`Stored ${recipes.length} recipes in IndexedDB`);
       }
       await renderIndex();
-      indexUl.classList.remove('hidden');
       route();
     }
   });
@@ -874,6 +1016,43 @@
   syncNowBtn.addEventListener('click', performSync);
   syncDisconnectBtn.addEventListener('click', disconnectFromSync);
   
+  // Menu dropdown handlers
+  const recipesMenuBtn = document.getElementById('recipes-menu-btn');
+  const recipesMenu = document.getElementById('recipes-menu');
+  const settingsMenuBtn = document.getElementById('settings-menu-btn');
+  const settingsMenu = document.getElementById('settings-menu');
+  const debugToggle = document.getElementById('debug-toggle');
+  const recipeList = document.getElementById('recipe-list');
+  
+  // Toggle dropdowns
+  recipesMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    settingsMenu.classList.remove('show');
+    recipesMenu.classList.toggle('show');
+  });
+  
+  settingsMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    recipesMenu.classList.remove('show');
+    settingsMenu.classList.toggle('show');
+  });
+  
+  // Debug toggle
+  debugToggle.addEventListener('click', () => {
+    const debugInfo = document.getElementById('debug-info');
+    debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
+  });
+  
+  // Close dropdowns when clicking outside
+  document.addEventListener('click', () => {
+    recipesMenu.classList.remove('show');
+    settingsMenu.classList.remove('show');
+  });
+  
+  // Prevent dropdown closing when clicking inside
+  recipesMenu.addEventListener('click', (e) => e.stopPropagation());
+  settingsMenu.addEventListener('click', (e) => e.stopPropagation());
+  
   (async () => {
     try {
       // Try to restore directory handle first (modern browsers)
@@ -881,7 +1060,6 @@
       if (saved && await verifyPermission(saved, 'read')) {
         dirHandle = saved;
         await renderIndex();
-        indexUl.classList.remove('hidden');
         route();
         return;
       }
@@ -900,7 +1078,6 @@
           lastModified: recipe.lastModified
         }));
         await renderIndex();
-        indexUl.classList.remove('hidden');
         route();
       }
     } catch (err) {
@@ -916,7 +1093,6 @@
       console.log('Sync initialization complete');
       // After sync is initialized, try to load synced recipes
       await renderIndex();
-      indexUl.classList.remove('hidden');
       route();
       console.log('DebugSync should now be available');
     } catch (error) {
