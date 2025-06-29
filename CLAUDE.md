@@ -65,7 +65,21 @@ No build process required. Simply open `index.html` in a modern browser (Chrome/
 - Requires manual folder selection on first use
 
 ## Planned Architecture
-The project is transitioning to a PWA + Google Drive architecture:
-- **Phase 1**: PWA with IndexedDB for local storage (see IMPLEMENTATION_PLAN.md)
-- **Phase 2**: Optional Google Drive sync for multi-device access
+The project is transitioning to a PWA + Cloud Sync architecture:
+- **Phase 1**: PWA with IndexedDB for local storage (COMPLETED)
+- **Phase 2**: Optional cloud sync for multi-device access
 - Maintains Markdown + YAML frontmatter format for data portability
+
+### Cloud Storage Abstraction
+The app uses an abstract `CloudStorageProvider` interface that allows swapping between different cloud providers:
+- **Interface**: `cloud-storage-interface.js` - Defines the contract all providers must implement
+- **Providers**: `google-drive-provider.js` (first implementation)
+- **Sync Manager**: `sync-manager.js` - Provider-agnostic sync logic
+
+This design allows easy addition of Dropbox, OneDrive, S3, or any other storage backend without changing the core application logic.
+
+### Environment Configuration
+- Use `.env` file for sensitive credentials (never commit)
+- `build-config.sh` generates `config.js` from `.env` 
+- Automatic config building in test server
+- Future providers can add their credentials to same `.env` file

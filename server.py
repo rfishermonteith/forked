@@ -1,44 +1,9 @@
-#!/bin/bash
-# Mobile testing script for Termux/Android
-# Run: bash test-mobile.sh [port]
-# Default port is 8080
-
-echo "📱 Recipe App Mobile Test Server"
-echo "================================"
-
-# Build configuration from .env file
-if [ -f build-config.sh ]; then
-    ./build-config.sh
-    if [ $? -ne 0 ]; then
-        echo "❌ Configuration build failed"
-        exit 1
-    fi
-fi
-
-# Check if Python is installed
-if ! command -v python &> /dev/null; then
-    echo "Python not found. Installing..."
-    pkg install python -y
-fi
-
-# Get the local IP address (works on Termux)
-if command -v ifconfig &> /dev/null; then
-    LOCAL_IP=$(ifconfig 2>/dev/null | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n1)
-else
-    LOCAL_IP=$(ip -4 addr show | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | grep -v '127.0.0.1' | head -n1)
-fi
-
-# Get port from command line argument or default to 8080
-PORT=${1:-8080}
-
-# Create simple Python server with dynamic port
-cat > server.py << EOF
 import http.server
 import socketserver
 import os
 import urllib.parse
 
-PORT = $PORT
+PORT = 8080
 
 class PWAHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
@@ -83,25 +48,3 @@ print(f"   ⚠️  Direct access to localhost:{PORT} will redirect to /forked/")
 
 with socketserver.TCPServer(("", PORT), PWAHandler) as httpd:
     httpd.serve_forever()
-EOF
-
-echo ""
-echo "🌐 Access URLs:"
-echo "  - On this device: http://localhost:$PORT/forked/"
-if [ ! -z "$LOCAL_IP" ]; then
-    echo "  - On same WiFi:  http://$LOCAL_IP:$PORT/forked/"
-fi
-echo ""
-echo "📝 PWA Testing Tips:"
-echo "  - Open in Chrome/Firefox on Android"
-echo "  - Look for 'Install' option in browser menu"
-echo "  - Test offline mode in airplane mode"
-echo ""
-echo "Press Ctrl+C to stop the server"
-echo ""
-
-# Run the server
-python server.py
-
-# Cleanup
-rm server.py
