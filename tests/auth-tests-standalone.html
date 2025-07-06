@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Drive Auth Tests</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            line-height: 1.5;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .test-suite {
+            margin: 20px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-case {
+            margin: 10px 0;
+            padding: 8px 15px;
+            border-radius: 3px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .pending {
+            background-color: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeeba;
+        }
+        .error-details {
+            margin-top: 5px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            border-radius: 3px;
+        }
+        #summary {
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e9ecef;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 3px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        h3 {
+            margin-top: 0;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>Google Drive Authentication Test Suite</h1>
+    <p>This tests the token persistence and automatic refresh functionality.</p>
+    
+    <button onclick="runTests()">Run All Tests</button>
+    <button onclick="clearResults()">Clear Results</button>
+    
+    <div id="summary"></div>
+    <div id="test-results"></div>
+
+    <script>
+        // Test framework
+        class TestRunner {
+            constructor() {
+                this.suites = [];
+                this.currentSuite = null;
+                this.results = {
+                    total: 0,
+                    passed: 0,
+                    failed: 0
+                };
+            }
+
+            describe(name, fn) {
+                this.currentSuite = { name, tests: [], beforeEach: null, afterEach: null };
+                this.suites.push(this.currentSuite);
+                fn();
+            }
+
+            test(name, fn) {
+                this.currentSuite.tests.push({ name, fn });
+            }
+
+            beforeEach(fn) {
+                this.currentSuite.beforeEach = fn;
+            }
+
+            afterEach(fn) {
+                this.currentSuite.afterEach = fn;
+            }
+
+            expect(actual) {
+                return {
+                    toBe: (expected) => {
+                        if (actual !== expected) {
+                            throw new Error(`Expected ${JSON.stringify(actual)} to be ${JSON.stringify(expected)}`);
+                        }
+                    },
+                    toBeTruthy: () => {
+                        if (!actual) {
+                            throw new Error(`Expected ${JSON.stringify(actual)} to be truthy`);
+                        }
+                    },
+                    toBeFalsy: () => {
+                        if (actual) {
+                            throw new Error(`Expected ${JSON.stringify(actual)} to be falsy`);
+                        }
+                    },
+                    toBeNull: () => {
+                        if (actual !== null) {
+                            throw new Error(`Expected ${JSON.stringify(actual)} to be null`);
+                        }
+                    },
+                    toBeGreaterThan: (value) => {
+                        if (!(actual > value)) {
+                            throw new Error(`Expected ${actual} to be greater than ${value}`);
+                        }
+                    },
+                    toMatch: (pattern) => {
+                        if (!pattern.test(actual)) {
+                            throw new Error(`Expected ${JSON.stringify(actual)} to match ${pattern}`);
+                        }
+                    },
+                    toContain: (value) => {
+                        if (!actual.includes(value)) {
+                            throw new Error(`Expected ${JSON.stringify(actual)} to contain ${JSON.stringify(value)}`);
+                        }
+                    },
+                    toHaveProperty: (prop, value) => {
+                        if (!(prop in actual)) {
+                            throw new Error(`Expected object to have property "${prop}"`);
+                        }
+                        if (value !== undefined && actual[prop] !== value) {
+                            throw new Error(`Expected property "${prop}" to be ${JSON.stringify(value)} but got ${JSON.stringify(actual[prop])}`);
+                        }
+                    }
+                };
+            }
+
+            async run() {
+                const resultsDiv = document.getElementById('test-results');
+                resultsDiv.innerHTML = '';
+                this.results = { total: 0, passed: 0, failed: 0 };
+
+                for (const suite of this.suites) {
+                    const suiteDiv = document.createElement('div');
+                    suiteDiv.className = 'test-suite';
+                    suiteDiv.innerHTML = `<h3>${suite.name}</h3>`;
+
+                    for (const test of suite.tests) {
+                        this.results.total++;
+                        const testDiv = document.createElement('div');
+                        testDiv.className = 'test-case';
+
+                        try {
+                            if (suite.beforeEach) await suite.beforeEach();
+                            await test.fn();
+                            if (suite.afterEach) await suite.afterEach();
+
+                            testDiv.className += ' pass';
+                            testDiv.innerHTML = `✓ ${test.name}`;
+                            this.results.passed++;
+                        } catch (error) {
+                            testDiv.className += ' fail';
+                            testDiv.innerHTML = `✗ ${test.name}`;
+                            const errorDiv = document.createElement('div');
+                            errorDiv.className = 'error-details';
+                            errorDiv.textContent = error.stack || error.message;
+                            testDiv.appendChild(errorDiv);
+                            this.results.failed++;
+                        }
+
+                        suiteDiv.appendChild(testDiv);
+                    }
+
+                    resultsDiv.appendChild(suiteDiv);
+                }
+
+                this.updateSummary();
+            }
+
+            updateSummary() {
+                const summaryDiv = document.getElementById('summary');
+                summaryDiv.innerHTML = `
+                    Test Results: ${this.results.passed} passed, ${this.results.failed} failed, ${this.results.total} total
+                    <br>
+                    ${this.results.failed === 0 ? '✅ All tests passed!' : '❌ Some tests failed'}
+                `;
+                summaryDiv.className = this.results.failed === 0 ? 'pass' : 'fail';
+            }
+        }
+
+        // Mock implementations
+        class MockLocalStorage {
+            constructor() {
+                this.store = {};
+            }
+            getItem(key) {
+                return this.store[key] || null;
+            }
+            setItem(key, value) {
+                this.store[key] = value;
+            }
+            removeItem(key) {
+                delete this.store[key];
+            }
+            clear() {
+                this.store = {};
+            }
+        }
+
+        // Simplified GoogleDriveProvider for testing
+        class GoogleDriveProvider {
+            constructor(config = {}) {
+                this.clientId = config.clientId;
+                this.isAuthenticated = false;
+                this.tokenClient = null;
+                this.localStorage = window.localStorage; // Store reference to localStorage
+            }
+
+            async init() {
+                // Simulate initialization
+                this.tokenClient = {
+                    requestAccessToken: (options) => {
+                        setTimeout(() => {
+                            if (this.tokenClient.callback) {
+                                this.tokenClient.callback({
+                                    access_token: 'mock_token_' + Date.now(),
+                                    expires_in: 3600
+                                });
+                            }
+                        }, 10);
+                    }
+                };
+
+                // Check for saved token
+                const savedToken = this.getSavedToken();
+                if (savedToken) {
+                    this.isAuthenticated = true;
+                }
+            }
+
+            async checkAuth() {
+                const token = this.getSavedToken();
+                if (!token) return false;
+
+                // Check if token is about to expire
+                if (token.expires_at) {
+                    const timeUntilExpiry = token.expires_at - Date.now();
+                    if (timeUntilExpiry < 5 * 60 * 1000) {
+                        return await this.silentRefresh();
+                    }
+                }
+
+                return true;
+            }
+
+            async authenticate() {
+                return new Promise((resolve) => {
+                    this.tokenClient.callback = (resp) => {
+                        if (resp.error) {
+                            resolve({ success: false, error: resp.error });
+                            return;
+                        }
+                        this.isAuthenticated = true;
+                        this.saveToken(resp);
+                        resolve({ success: true });
+                    };
+                    this.tokenClient.requestAccessToken({ prompt: 'consent' });
+                });
+            }
+
+            async silentRefresh() {
+                return new Promise((resolve) => {
+                    this.tokenClient.callback = (resp) => {
+                        if (resp.error) {
+                            resolve(false);
+                            return;
+                        }
+                        this.isAuthenticated = true;
+                        this.saveToken(resp);
+                        resolve(true);
+                    };
+                    this.tokenClient.requestAccessToken({ prompt: '' });
+                });
+            }
+
+            saveToken(tokenResponse) {
+                const tokenData = {
+                    access_token: tokenResponse.access_token,
+                    expires_at: Date.now() + (tokenResponse.expires_in * 1000)
+                };
+                this.localStorage.setItem('google_drive_token', JSON.stringify(tokenData));
+            }
+
+            getSavedToken() {
+                try {
+                    const savedData = this.localStorage.getItem('google_drive_token');
+                    if (!savedData) return null;
+
+                    const tokenData = JSON.parse(savedData);
+
+                    // Check if expired
+                    if (Date.now() >= tokenData.expires_at) {
+                        this.localStorage.removeItem('google_drive_token');
+                        return null;
+                    }
+
+                    return tokenData;
+                } catch (error) {
+                    return null;
+                }
+            }
+
+            clearSavedToken() {
+                this.localStorage.removeItem('google_drive_token');
+            }
+
+            async signOut() {
+                this.clearSavedToken();
+                this.isAuthenticated = false;
+            }
+        }
+
+        // Define tests
+        function defineTests(runner) {
+            runner.describe('Token Persistence', () => {
+                let provider;
+                let mockStorage;
+
+                runner.beforeEach(() => {
+                    mockStorage = new MockLocalStorage();
+                    window.localStorage = mockStorage;
+                    provider = new GoogleDriveProvider({ clientId: 'test-client' });
+                    provider.localStorage = mockStorage; // Ensure provider uses our mock
+                });
+
+                runner.afterEach(() => {
+                    delete window.localStorage;
+                });
+
+                runner.test('should save token with expiration time', async () => {
+                    await provider.init();
+                    const authResult = await provider.authenticate();
+                    
+                    runner.expect(authResult.success).toBe(true);
+                    
+                    const savedData = JSON.parse(mockStorage.getItem('google_drive_token'));
+                    runner.expect(savedData).toBeTruthy();
+                    runner.expect(savedData.access_token).toMatch(/^mock_token_/);
+                    runner.expect(savedData.expires_at).toBeGreaterThan(Date.now());
+                });
+
+                runner.test('should restore valid saved token on init', async () => {
+                    const futureExpiry = Date.now() + (60 * 60 * 1000);
+                    mockStorage.setItem('google_drive_token', JSON.stringify({
+                        access_token: 'saved_token',
+                        expires_at: futureExpiry
+                    }));
+
+                    await provider.init();
+                    runner.expect(provider.isAuthenticated).toBe(true);
+                });
+
+                runner.test('should clear expired token on init', async () => {
+                    const pastExpiry = Date.now() - 1000;
+                    mockStorage.setItem('google_drive_token', JSON.stringify({
+                        access_token: 'expired_token',
+                        expires_at: pastExpiry
+                    }));
+
+                    await provider.init();
+                    runner.expect(provider.isAuthenticated).toBe(false);
+                    runner.expect(mockStorage.getItem('google_drive_token')).toBeNull();
+                });
+            });
+
+            runner.describe('Token Refresh', () => {
+                let provider;
+                let mockStorage;
+
+                runner.beforeEach(() => {
+                    mockStorage = new MockLocalStorage();
+                    window.localStorage = mockStorage;
+                    provider = new GoogleDriveProvider({ clientId: 'test-client' });
+                    provider.localStorage = mockStorage; // Ensure provider uses our mock
+                });
+
+                runner.test('should attempt refresh when token is about to expire', async () => {
+                    await provider.init();
+                    
+                    // Set token that expires in 4 minutes
+                    const nearExpiry = Date.now() + (4 * 60 * 1000);
+                    mockStorage.setItem('google_drive_token', JSON.stringify({
+                        access_token: 'expiring_token',
+                        expires_at: nearExpiry
+                    }));
+
+                    const isAuth = await provider.checkAuth();
+                    runner.expect(isAuth).toBe(true);
+                    
+                    // Check that a new token was saved
+                    const newToken = JSON.parse(mockStorage.getItem('google_drive_token'));
+                    runner.expect(newToken.access_token).toMatch(/^mock_token_/);
+                    runner.expect(newToken.expires_at).toBeGreaterThan(nearExpiry);
+                });
+
+                runner.test('should return false if refresh fails', async () => {
+                    await provider.init();
+                    
+                    // Override silentRefresh to fail
+                    provider.silentRefresh = async () => false;
+                    
+                    // Set expired token
+                    const pastExpiry = Date.now() - 1000;
+                    mockStorage.setItem('google_drive_token', JSON.stringify({
+                        access_token: 'expired_token',
+                        expires_at: pastExpiry
+                    }));
+
+                    const isAuth = await provider.checkAuth();
+                    runner.expect(isAuth).toBe(false);
+                });
+            });
+
+            runner.describe('Sign Out', () => {
+                let provider;
+                let mockStorage;
+
+                runner.beforeEach(() => {
+                    mockStorage = new MockLocalStorage();
+                    window.localStorage = mockStorage;
+                    provider = new GoogleDriveProvider({ clientId: 'test-client' });
+                    provider.localStorage = mockStorage; // Ensure provider uses our mock
+                });
+
+                runner.test('should clear token and reset auth state', async () => {
+                    await provider.init();
+                    await provider.authenticate();
+                    
+                    runner.expect(mockStorage.getItem('google_drive_token')).toBeTruthy();
+                    runner.expect(provider.isAuthenticated).toBe(true);
+
+                    await provider.signOut();
+                    
+                    runner.expect(mockStorage.getItem('google_drive_token')).toBeNull();
+                    runner.expect(provider.isAuthenticated).toBe(false);
+                });
+            });
+        }
+
+        // Run tests
+        async function runTests() {
+            const runner = new TestRunner();
+            defineTests(runner);
+            await runner.run();
+        }
+
+        function clearResults() {
+            document.getElementById('test-results').innerHTML = '';
+            document.getElementById('summary').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

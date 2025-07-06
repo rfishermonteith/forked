@@ -1,0 +1,12 @@
+{
+  "name": "recipe-box",
+  "version": "1.0.0",
+  "description": "Local-first recipe management with cloud sync",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/simple-auth.test.mjs && node tests/token-expiration-scenario.test.mjs",
+    "test:simple": "node tests/simple-auth.test.mjs",
+    "test:scenario": "node tests/token-expiration-scenario.test.mjs",
+    "test:browser": "echo 'Open tests/auth-tests-standalone.html in your browser to run browser tests'"
+  }
+}
