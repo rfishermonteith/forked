@@ -416,29 +416,9 @@
   const syncManager = new SyncManager();
   let syncEnabled = false;
   
-  // Expose sync manager for debugging
-  window.debugSync = {
-    manager: syncManager,
-    async listCloudRecipes() {
-      if (!syncManager.provider) {
-        console.log('Sync not initialized');
-        return [];
-      }
-      const recipes = await syncManager.provider.listRecipes();
-      console.log('Cloud recipes found:', recipes);
-      return recipes;
-    },
-    async listLocalRecipes() {
-      const recipes = await get('recipeData') || [];
-      console.log('Local recipes found:', recipes);
-      return recipes;
-    },
-    async testSync() {
-      console.log('Testing sync process...');
-      await this.listLocalRecipes();
-      await this.listCloudRecipes();
-    }
-  };
+  // Constants
+  const SYNC_PROGRESS_HIDE_DELAY = 3000;
+  const PWA_INSTALL_DELAY = 10000;
 
   // UI references
   const pickBtn = document.getElementById('pickDir');
@@ -459,6 +439,27 @@
     s.toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
+
+  // Helper function to process recipe and image files
+  const processRecipeFile = (slug, file, source) => {
+    slugToFile.set(slug, file);
+    
+    // Create recipe item element
+    const item = document.createElement('div');
+    item.className = 'recipe-item';
+    
+    const icon = source === 'cloud' ? '☁️ ' : (source === 'local' ? '📁 ' : '');
+    const fileName = file.name || file;
+    const displayName = fileName.replace(/\.md$/, '');
+    
+    item.textContent = `${icon}${displayName}`;
+    item.addEventListener('click', () => {
+      window.location.hash = `#recipe=${slug}`;
+      document.getElementById('recipes-menu').classList.remove('show');
+    });
+    
+    recipeListDiv.appendChild(item);
+  };
 
   const renderIndex = async () => {
     recipeListDiv.innerHTML = '';
@@ -494,14 +495,7 @@
           slugToImage.set(slug, imageMap.get(slug));
         }
         
-        const recipeItem = document.createElement('div');
-        recipeItem.className = 'recipe-item';
-        recipeItem.innerHTML = `${recipe.name.replace(/\.md$/, '')} <span style="color: #28a745;">☁️</span>`;
-        recipeItem.addEventListener('click', () => {
-          window.location.hash = `#recipe=${slug}`;
-          document.getElementById('recipes-menu').classList.remove('show');
-        });
-        recipeListDiv.appendChild(recipeItem);
+        processRecipeFile(slug, file, 'cloud');
       }
       return; // Exit early if we have synced recipes
     }
@@ -539,14 +533,7 @@
             slugToImage.set(slug, imageFiles.get(slug));
           }
           
-          const recipeItem = document.createElement('div');
-          recipeItem.className = 'recipe-item';
-          recipeItem.innerHTML = `${baseName} <span style="color: #6c757d;">📁</span>`;
-          recipeItem.addEventListener('click', () => {
-            window.location.hash = `#recipe=${slug}`;
-            document.getElementById('recipes-menu').classList.remove('show');
-          });
-          recipeListDiv.appendChild(recipeItem);
+          processRecipeFile(slug, file, 'local');
         }
       }
     } else {
@@ -573,14 +560,7 @@
             slugToImage.set(slug, imageEntries.get(slug));
           }
           
-          const recipeItem = document.createElement('div');
-          recipeItem.className = 'recipe-item';
-          recipeItem.innerHTML = `${baseName} <span style="color: #6c757d;">📁</span>`;
-          recipeItem.addEventListener('click', () => {
-            window.location.hash = `#recipe=${slug}`;
-            document.getElementById('recipes-menu').classList.remove('show');
-          });
-          recipeListDiv.appendChild(recipeItem);
+          processRecipeFile(slug, entry, 'local');
         }
       }
     }
@@ -644,7 +624,6 @@
   async function verifyPermission(handle, mode = 'read') {
     const opts = { mode };
     // Was permission already granted?
-    console.log(await handle.queryPermission(opts))
     if ((await handle.queryPermission(opts)) === 'granted') return true;
     // If not, ask (only once per session)
     return (await handle.requestPermission(opts)) === 'granted';
@@ -821,7 +800,7 @@
     }
     
     await updateSyncStatus();
-    setTimeout(() => syncProgress.classList.add('hidden'), 3000);
+    setTimeout(() => syncProgress.classList.add('hidden'), SYNC_PROGRESS_HIDE_DELAY);
   }
 
   async function disconnectFromSync() {
@@ -1141,10 +1120,43 @@
     settingsMenu.classList.toggle('show');
   });
   
-  // Debug toggle
+  // Debug toggle with utility functions
+  let debugUtils = null;
+  
   debugToggle.addEventListener('click', () => {
     const debugInfo = document.getElementById('debug-info');
     debugInfo.style.display = debugInfo.style.display === 'none' ? 'block' : 'none';
+    
+    // Initialize debug utilities when debug panel is opened
+    if (debugInfo.style.display === 'block' && !debugUtils) {
+      debugUtils = {
+        clearCacheAndReload: async () => {
+          try {
+            // Clear service worker caches
+            const cacheNames = await caches.keys();
+            await Promise.all(cacheNames.map(name => caches.delete(name)));
+            
+            // Clear IndexedDB data
+            await clear();
+            
+            // Unregister service worker
+            if ('serviceWorker' in navigator) {
+              const registrations = await navigator.serviceWorker.getRegistrations();
+              await Promise.all(registrations.map(reg => reg.unregister()));
+            }
+            
+            // Force reload
+            window.location.reload(true);
+          } catch (err) {
+            console.error('Error clearing cache:', err);
+            window.location.reload(true);
+          }
+        }
+      };
+      
+      // Make debug utilities available globally only when debug is active
+      window.debugUtils = debugUtils;
+    }
   });
   
   // Close dropdowns when clicking outside
@@ -1279,7 +1291,7 @@
         Navigator Standalone: ${window.navigator.standalone}<br>
         Referrer: ${document.referrer}<br>
         User Agent: ${navigator.userAgent.substring(0, 50)}...<br>
-        <button onclick="clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
+        <button onclick="window.debugUtils?.clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
       `;
       debugDiv.style.display = 'block';
       
@@ -1327,29 +1339,6 @@
     await set('appInstalled', true);
   });
 
-  // Function to clear cache and reload (for debugging)
-  window.clearCacheAndReload = async () => {
-    try {
-      // Clear service worker caches
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map(name => caches.delete(name)));
-      
-      // Clear IndexedDB data
-      await clear();
-      
-      // Unregister service worker
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map(reg => reg.unregister()));
-      }
-      
-      // Force reload
-      window.location.reload(true);
-    } catch (err) {
-      console.error('Error clearing cache:', err);
-      window.location.reload(true);
-    }
-  };
 </script>
 </body>
 </html>

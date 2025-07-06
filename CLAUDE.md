@@ -83,3 +83,27 @@ This design allows easy addition of Dropbox, OneDrive, S3, or any other storage 
 - `build-config.sh` generates `config.js` from `.env` 
 - Automatic config building in test server
 - Future providers can add their credentials to same `.env` file
+
+## Testing Requirements
+
+IMPORTANT: Always run tests before committing code changes:
+
+1. **Run automated tests**:
+   ```bash
+   npm test
+   ```
+   This verifies core authentication logic including token expiration and refresh.
+
+2. **For authentication changes**, also run browser tests:
+   ```bash
+   open tests/auth-tests-standalone.html
+   ```
+   Click "Run All Tests" and ensure all pass.
+
+3. **Test coverage includes**:
+   - Token persistence and expiration
+   - Automatic token refresh
+   - Sign-out cleanup
+   - API retry logic
+
+Always ensure tests pass before suggesting commits. Tests are lightweight and require no dependencies.

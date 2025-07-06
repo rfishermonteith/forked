@@ -162,3 +162,34 @@ To set up your own instance with a different Google Cloud project:
 - **Manual Folder**: Must create "RecipeBox" folder manually
 
 These will be addressed in upcoming releases!
+
+## Testing
+
+The project includes automated tests to ensure authentication reliability:
+
+### Running Tests Locally
+
+1. **Quick automated test** (no dependencies required):
+   ```bash
+   npm test
+   ```
+   This runs core authentication logic tests including token expiration and refresh scenarios.
+
+2. **Browser integration test**:
+   ```bash
+   open tests/auth-tests-standalone.html
+   ```
+   Click "Run All Tests" to verify the full authentication flow in a browser environment.
+
+### Test Coverage
+
+The tests verify:
+- Token persistence across sessions
+- Automatic token refresh when approaching expiration
+- Proper handling of expired tokens
+- Sign-out cleanup
+- Token refresh retry logic
+
+### CI/CD
+
+Tests run automatically on all pull requests to the main branch via GitHub Actions.

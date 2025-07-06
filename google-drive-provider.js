@@ -59,16 +59,80 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     const token = gapi.client.getToken();
     if (!token) return false;
     
+    // Check if token is about to expire (within 5 minutes)
+    const savedToken = this.getSavedToken();
+    if (savedToken && savedToken.expires_at) {
+      const timeUntilExpiry = savedToken.expires_at - Date.now();
+      if (timeUntilExpiry < 5 * 60 * 1000) { // Less than 5 minutes
+        console.log('Token expiring soon, attempting silent refresh...');
+        return await this.silentRefresh();
+      }
+    }
+    
     // Verify token is still valid by making a test API call
     try {
       await gapi.client.drive.about.get({ fields: 'user' });
       return true;
     } catch (error) {
       console.log('Token validation failed:', error);
+      // Try silent refresh before giving up
+      const refreshed = await this.silentRefresh();
+      if (refreshed) {
+        return true;
+      }
       // Clear invalid token
       gapi.client.setToken('');
       this.clearSavedToken();
       return false;
+    }
+  }
+
+  async silentRefresh() {
+    return new Promise((resolve) => {
+      this.tokenClient.callback = async (resp) => {
+        if (resp.error !== undefined) {
+          console.error('Silent refresh failed:', resp.error);
+          resolve(false);
+          return;
+        }
+        
+        console.log('Silent refresh successful');
+        this.isAuthenticated = true;
+        this.saveToken();
+        resolve(true);
+      };
+      
+      // Attempt to get a new token without user interaction
+      this.tokenClient.requestAccessToken({ prompt: '' });
+    });
+  }
+
+  /**
+   * Wrapper for API calls that handles token refresh automatically
+   */
+  async withTokenRefresh(apiCall) {
+    try {
+      // First check if token is about to expire
+      const authValid = await this.checkAuth();
+      if (!authValid) {
+        throw new Error('Authentication required');
+      }
+      
+      // Make the API call
+      return await apiCall();
+    } catch (error) {
+      // If we get a 401 error, try to refresh the token once
+      if (error.status === 401 && !error._retried) {
+        console.log('Token expired during API call, attempting refresh...');
+        const refreshed = await this.silentRefresh();
+        if (refreshed) {
+          // Mark that we've retried to avoid infinite loops
+          error._retried = true;
+          // Retry the API call
+          return await apiCall();
+        }
+      }
+      throw error;
     }
   }
 
@@ -94,6 +158,8 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       const existingToken = gapi.client.getToken();
       if (existingToken === null) {
         // First time authentication - request with consent
+        // Note: For a pure client-side app, we cannot use refresh tokens
+        // The best we can do is prompt for re-authentication when needed
         this.tokenClient.requestAccessToken({ 
           prompt: 'consent',
           hint: 'Select or create the account you want to use for Recipe Box'
@@ -129,18 +195,20 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       throw new Error('No recipe folder selected. Please select a folder first.');
     }
     
-    const response = await gapi.client.drive.files.list({
-      q: `'${this.recipeFolderId}' in parents and name contains '.md' and trashed=false`,
-      fields: 'files(id, name, modifiedTime, size)',
-      orderBy: 'modifiedTime desc'
-    });
+    return this.withTokenRefresh(async () => {
+      const response = await gapi.client.drive.files.list({
+        q: `'${this.recipeFolderId}' in parents and name contains '.md' and trashed=false`,
+        fields: 'files(id, name, modifiedTime, size)',
+        orderBy: 'modifiedTime desc'
+      });
 
-    return response.result.files.map(file => ({
-      id: file.id,
-      name: file.name,
-      lastModified: new Date(file.modifiedTime),
-      size: parseInt(file.size || 0)
-    }));
+      return response.result.files.map(file => ({
+        id: file.id,
+        name: file.name,
+        lastModified: new Date(file.modifiedTime),
+        size: parseInt(file.size || 0)
+      }));
+    });
   }
 
   /**
@@ -569,7 +637,10 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         localStorage.setItem('google_drive_token', savedData);
       }
       
-      return { access_token: tokenData.access_token };
+      return { 
+        access_token: tokenData.access_token,
+        expires_at: tokenData.expires_at
+      };
     } catch (error) {
       console.error('Error retrieving saved token:', error);
       return null;
