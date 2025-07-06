@@ -44,11 +44,21 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       gapi.client.setToken(savedToken);
       console.log('Restored saved authentication token');
       
-      // Check if already authenticated (this will validate the token)
-      this.isAuthenticated = await this.checkAuth();
+      // Set initial auth state based on token existence and expiry
+      // We'll do full validation later when actually needed
+      this.isAuthenticated = true;
       
-      if (!this.isAuthenticated) {
-        console.log('Saved token was invalid or expired');
+      // Quick check: if token is expired, mark as not authenticated
+      if (savedToken.expires_at && Date.now() >= savedToken.expires_at) {
+        console.log('Saved token is expired - will refresh when needed');
+        this.isAuthenticated = false;
+      } else if (savedToken.expires_at) {
+        // Token exists and is not expired, but check if it's about to expire
+        const timeUntilExpiry = savedToken.expires_at - Date.now();
+        if (timeUntilExpiry < 5 * 60 * 1000) { // Less than 5 minutes
+          console.log('Saved token expires soon - will refresh when needed');
+          // Keep authenticated=true but refresh will happen on first API call
+        }
       }
     } else {
       this.isAuthenticated = false;
@@ -98,7 +108,7 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         
         console.log('Silent refresh successful');
         this.isAuthenticated = true;
-        this.saveToken();
+        this.saveToken(resp);
         resolve(true);
       };
       
@@ -149,7 +159,7 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         this.isAuthenticated = true;
         
         // Save the token for persistence
-        this.saveToken();
+        this.saveToken(resp);
         
         resolve({ success: true });
       };
@@ -603,13 +613,14 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   // Token persistence methods
-  saveToken() {
-    const token = gapi.client.getToken();
+  saveToken(tokenResponse = null) {
+    const token = tokenResponse || gapi.client.getToken();
     if (token) {
       // Store token with expiry time
+      const expiresIn = tokenResponse?.expires_in || 3600; // Default to 1 hour if not provided
       const tokenData = {
         access_token: token.access_token,
-        expires_at: Date.now() + (token.expires_in * 1000)
+        expires_at: Date.now() + (expiresIn * 1000)
       };
       // Use localStorage for better persistence across browser sessions
       localStorage.setItem('google_drive_token', JSON.stringify(tokenData));
