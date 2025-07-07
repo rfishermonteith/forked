@@ -679,12 +679,13 @@
         console.log('Sync initialized successfully');
         
         // Check if we're already authenticated (from saved token)
+        console.log('📱 App: Checking if user is already authenticated...');
         const isAuth = await syncManager.isAuthenticated();
-        console.log('Authentication status after init:', isAuth);
+        console.log(`📱 App: Authentication status after init: ${isAuth ? '✅ AUTHENTICATED' : '❌ NOT AUTHENTICATED'}`);
         
         if (isAuth) {
           // We have a valid saved token - update UI to show connected state
-          console.log('Found valid saved authentication');
+          console.log('📱 App: ✅ Found valid saved authentication - setting up automatic sync');
           
           // Try to restore previously selected folder
           const restoredFolder = await syncManager.provider.restoreFolderSelection();
@@ -715,7 +716,7 @@
           }
         } else {
           // Not authenticated - show default disconnected state
-          console.log('No valid saved authentication found');
+          console.log('📱 App: ❌ No valid saved authentication found - user needs to connect');
           await updateSyncStatus();
         }
       } else {
