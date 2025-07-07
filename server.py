@@ -34,7 +34,13 @@ class PWAHandler(http.server.SimpleHTTPRequestHandler):
     
     def end_headers(self):
         self.send_header('Service-Worker-Allowed', '/')
-        self.send_header('Cache-Control', 'no-cache')
+        # Aggressive cache prevention for development
+        if self.path.endswith(('.js', '.html', '.css')):
+            self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+            self.send_header('Pragma', 'no-cache')
+            self.send_header('Expires', '0')
+        else:
+            self.send_header('Cache-Control', 'no-cache')
         super().end_headers()
     
     def log_message(self, format, *args):
