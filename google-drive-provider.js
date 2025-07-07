@@ -43,10 +43,6 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     if (savedToken) {
       console.log('🔐 GoogleDrive: Found saved token in localStorage');
       
-      // ALWAYS set the token in gapi.client, even if expired
-      // This allows us to attempt refresh
-      gapi.client.setToken(savedToken);
-      
       if (savedToken.expires_at) {
         const now = Date.now();
         const expiresAt = new Date(savedToken.expires_at);
@@ -57,9 +53,8 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         console.log(`🔐 GoogleDrive: Time until expiry: ${minutesUntilExpiry} minutes`);
         
         if (timeUntilExpiry <= 0) {
-          console.log('🔐 GoogleDrive: ❌ Token is EXPIRED - will attempt refresh on first use');
-          // Set as authenticated to allow refresh attempt
-          this.isAuthenticated = true;
+          console.log('🔐 GoogleDrive: ❌ Token is EXPIRED - will need refresh');
+          this.isAuthenticated = false;
         } else if (timeUntilExpiry < 5 * 60 * 1000) {
           console.log('🔐 GoogleDrive: ⚠️  Token expires soon - will auto-refresh on first API call');
           this.isAuthenticated = true;
@@ -72,6 +67,7 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         this.isAuthenticated = true;
       }
       
+      gapi.client.setToken(savedToken);
       console.log(`🔐 GoogleDrive: Set initial auth state: ${this.isAuthenticated ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'}`);
     } else {
       console.log('🔐 GoogleDrive: No saved token found - user needs to authenticate');
@@ -117,11 +113,10 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         console.log('🔍 GoogleDrive: ✅ Silent refresh successful');
         return true;
       }
-      // Clear invalid token only after refresh fails
+      // Clear invalid token
       console.log('🔍 GoogleDrive: ❌ Silent refresh failed - clearing token');
       gapi.client.setToken('');
       this.clearSavedToken();
-      this.isAuthenticated = false;
       return false;
     }
   }
@@ -693,11 +688,12 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       const tokenData = JSON.parse(savedData);
       console.log('📖 GoogleDrive: Found saved token data');
       
-      // DON'T remove expired tokens here - let checkAuth/silentRefresh handle it
-      // This allows us to attempt refresh with the expired token
+      // Check if token is expired
       if (tokenData.expires_at && Date.now() >= tokenData.expires_at) {
-        console.log('📖 GoogleDrive: Saved token is expired (will attempt refresh)');
-        // Still return the expired token so we can try to refresh it
+        console.log('📖 GoogleDrive: Saved token is expired - removing from storage');
+        localStorage.removeItem('google_drive_token');
+        sessionStorage.removeItem('google_drive_token');
+        return null;
       }
       
       // Migrate from sessionStorage to localStorage if needed
