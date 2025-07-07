@@ -39,6 +39,8 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         if (error.type === 'popup_failed_to_open') {
           console.log('🔄 GoogleDrive: Popup blocked - will use redirect flow');
           this.useRedirectFlow = true;
+          // Store the error so authenticate() can handle it
+          this.lastAuthError = error;
         }
       },
     });
@@ -208,21 +210,17 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   async authenticate() {
     // If we should use redirect flow (mobile or popup failed), use that instead
     if (this.useRedirectFlow) {
+      console.log('🔄 GoogleDrive: Using redirect flow for mobile/popup-blocked browser');
       return this.authenticateWithRedirect();
     }
 
+    // For desktop, try popup flow first
     return new Promise((resolve) => {
+      let popupAttempted = false;
+      
       this.tokenClient.callback = async (resp) => {
         if (resp.error !== undefined) {
           console.error('Authentication error:', resp.error);
-          // If popup fails, try redirect flow
-          if (resp.error.type === 'popup_failed_to_open') {
-            console.log('🔄 GoogleDrive: Popup failed, falling back to redirect flow');
-            this.useRedirectFlow = true;
-            const redirectResult = await this.authenticateWithRedirect();
-            resolve(redirectResult);
-            return;
-          }
           resolve({ success: false, error: resp.error });
           return;
         }
@@ -236,20 +234,33 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         resolve({ success: true });
       };
       
-      // Check if we already have a valid token
-      const existingToken = gapi.client.getToken();
-      if (existingToken === null) {
-        // First time authentication - request with consent
-        // Note: For a pure client-side app, we cannot use refresh tokens
-        // The best we can do is prompt for re-authentication when needed
-        this.tokenClient.requestAccessToken({ 
-          prompt: 'consent',
-          hint: 'Select or create the account you want to use for Recipe Box'
-        });
-      } else {
-        // Try to refresh/reuse existing token
-        this.tokenClient.requestAccessToken({ prompt: '' });
+      // Try to request token
+      try {
+        // Check if we already have a valid token
+        const existingToken = gapi.client.getToken();
+        if (existingToken === null) {
+          // First time authentication - request with consent
+          this.tokenClient.requestAccessToken({ 
+            prompt: 'consent',
+            hint: 'Select or create the account you want to use for Recipe Box'
+          });
+        } else {
+          // Try to refresh/reuse existing token
+          this.tokenClient.requestAccessToken({ prompt: '' });
+        }
+        popupAttempted = true;
+      } catch (error) {
+        console.error('Failed to request token:', error);
+        resolve({ success: false, error: error });
       }
+      
+      // Check if popup was blocked immediately
+      setTimeout(() => {
+        if (popupAttempted && this.lastAuthError?.type === 'popup_failed_to_open') {
+          console.log('🔄 GoogleDrive: Popup was blocked, redirecting now...');
+          this.authenticateWithRedirect();
+        }
+      }, 100);
     });
   }
 
@@ -260,21 +271,28 @@ export class GoogleDriveProvider extends CloudStorageProvider {
     console.log('🔄 GoogleDrive: Using redirect flow for authentication');
     
     // Build the OAuth URL manually
+    const redirectUri = window.location.origin + window.location.pathname;
+    console.log('🔄 GoogleDrive: Redirect URI:', redirectUri);
+    
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
     authUrl.searchParams.set('client_id', this.clientId);
-    authUrl.searchParams.set('redirect_uri', window.location.origin + window.location.pathname);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
     authUrl.searchParams.set('response_type', 'token');
     authUrl.searchParams.set('scope', this.scopes);
     authUrl.searchParams.set('state', 'google_drive_auth');
     authUrl.searchParams.set('include_granted_scopes', 'true');
     
-    console.log('🔄 GoogleDrive: Redirecting to Google OAuth...');
+    console.log('🔄 GoogleDrive: OAuth URL:', authUrl.toString());
+    console.log('🔄 GoogleDrive: Redirecting to Google OAuth in 1 second...');
     
     // Store a flag to know we're in auth flow
     sessionStorage.setItem('google_drive_auth_in_progress', 'true');
     
-    // Redirect to Google OAuth
-    window.location.href = authUrl.toString();
+    // Small delay to ensure console logs are visible
+    setTimeout(() => {
+      console.log('🔄 GoogleDrive: Redirecting now!');
+      window.location.href = authUrl.toString();
+    }, 1000);
     
     // This return won't be reached, but needed for TypeScript
     return { success: false, error: 'Redirect in progress' };

@@ -129,6 +129,24 @@ async function testFullInitializationFlow() {
     global.localStorage = mockStorage;
     global.sessionStorage = { getItem: () => null, setItem: () => {}, removeItem: () => {} };
     
+    // Mock window and navigator for OAuth redirect flow
+    global.window = {
+      location: {
+        origin: 'http://localhost:8080',
+        pathname: '/forked/',
+        hash: '',
+        href: ''
+      }
+    };
+    // Mock navigator using defineProperty since it's read-only
+    Object.defineProperty(global, 'navigator', {
+      value: {
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+      },
+      writable: true,
+      configurable: true
+    });
+    
     console.log('1. 💾 Setup: Expired token in localStorage (2 hours old)');
     console.log('2. 🚀 Starting app initialization...\n');
     

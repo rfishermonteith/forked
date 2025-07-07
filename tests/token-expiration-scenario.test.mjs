@@ -165,6 +165,24 @@ async function runTest() {
       removeItem: () => {}
     };
     
+    // Mock window and navigator for OAuth redirect flow
+    global.window = {
+      location: {
+        origin: 'http://localhost:8080',
+        pathname: '/forked/',
+        hash: '',
+        href: ''
+      }
+    };
+    // Mock navigator using defineProperty since it's read-only
+    Object.defineProperty(global, 'navigator', {
+      value: {
+        userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+      },
+      writable: true,
+      configurable: true
+    });
+    
     // Create real GoogleDriveProvider instance
     const provider = new GoogleDriveProvider({ clientId: 'test' });
     provider.recipeFolderId = 'test-folder';
