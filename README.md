@@ -68,12 +68,11 @@ Some nice-to-haves:
    git clone -b pwa-implementation https://github.com/yourusername/forked.git
    cd forked
    
-   # Install uv if needed
+   # Install python if needed
    pkg install python
-   pip install uv
    
    # Run development server
-   uv run dev-server.py
+   python dev-server.py
    ```
 
 3. **Open in Chrome/Firefox**:
