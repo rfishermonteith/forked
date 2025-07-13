@@ -107,3 +107,36 @@ IMPORTANT: Always run tests before committing code changes:
    - API retry logic
 
 Always ensure tests pass before suggesting commits. Tests are lightweight and require no dependencies.
+
+## Service Worker Cache Management
+
+The app uses a service worker for PWA functionality and offline support. When making changes to cached files, **you must update the cache version** to ensure users see the latest changes.
+
+### Cache Busting Process
+
+1. **Update version in `sw.js`**:
+   ```javascript
+   const VERSION = '0.1.X'; // Increment version number
+   ```
+
+2. **Add new resources to cache** (if applicable):
+   ```javascript
+   const urlsToCache = [
+     // Add new files that should be cached
+   ];
+   ```
+
+3. **Commit and deploy** the service worker changes
+
+### When to Bust Cache
+
+- Any changes to `index.html`, JavaScript modules, or CSS
+- New features that affect cached resources
+- Bug fixes in client-side code
+- Changes to manifest.json or icons
+
+### Current Version Tracking
+
+The service worker version should be incremented for each release that affects cached resources. This ensures the old cache is invalidated and new files are downloaded.
+
+**Note**: The service worker automatically handles cache cleanup when the version changes.
