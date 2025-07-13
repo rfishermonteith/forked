@@ -22,6 +22,12 @@ WATCH_EXTENSIONS = {'.js', '.html', '.css', '.json', '.md'}
 WATCH_DIRS = ['.']
 IGNORE_DIRS = {'.git', 'node_modules', '__pycache__', '.idea', '.vscode', '.uv'}
 
+class ReuseAddrTCPServer(socketserver.TCPServer):
+    """TCPServer with SO_REUSEADDR set to allow quick restart"""
+    def server_bind(self):
+        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        super().server_bind()
+
 class PWAHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         # Redirect root requests to /forked/
@@ -214,6 +220,7 @@ def run_server(port, no_watch=False):
             watcher.stop()
         if httpd:
             httpd.shutdown()
+            httpd.server_close()  # Properly close the socket
         sys.exit(0)
     
     # Set up signal handler for clean shutdown
@@ -254,7 +261,7 @@ def run_server(port, no_watch=False):
         
         # Start server
         try:
-            httpd = socketserver.TCPServer(("", port), PWAHandler)
+            httpd = ReuseAddrTCPServer(("", port), PWAHandler)
             server_thread = threading.Thread(target=httpd.serve_forever)
             server_thread.start()
             
@@ -264,13 +271,14 @@ def run_server(port, no_watch=False):
             
             httpd.shutdown()
             server_thread.join()
+            httpd.server_close()  # Properly close the socket
             
             if watcher:
                 watcher.stop()
             
             # If we're here, a restart was requested
-            print("\n♻️  Restarting in 1 second...")
-            time.sleep(1)
+            print("\n♻️  Restarting in 2 seconds...")
+            time.sleep(2)  # Give more time for socket to release
             
         except OSError as e:
             print(f"\n❌ Error: {e}")

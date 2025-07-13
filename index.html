@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="description" content="A local-first recipe management app">
 <meta name="theme-color" content="#2c3e50">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png" type="image/png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="manifest" href="/forked/manifest.json">
+<link rel="icon" href="/forked/icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="/forked/icons/icon-192.png">
 <title>Recipe Box</title>
 <style>
   body {
@@ -223,6 +223,19 @@
     margin-bottom: 2rem;
   }
   
+  .app-icon {
+    width: 28px;
+    height: 28px;
+    margin-right: 0.5rem;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+  }
+  
+  .app-icon:hover {
+    opacity: 0.8;
+  }
+  
   .menu-dropdown {
     position: relative;
     display: inline-block;
@@ -313,6 +326,9 @@
 </div>
 <!-- Minimalist Menu Bar -->
 <nav class="menu-bar">
+  <!-- App Icon -->
+  <img src="/forked/icons/icon.svg" alt="Recipe Box" class="app-icon">
+  
   <!-- Recipes Dropdown -->
   <div class="menu-dropdown">
     <button class="menu-button" id="recipes-menu-btn">
@@ -396,9 +412,9 @@
   import { get, set, clear } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
   
   // Import cloud sync modules
-  import './cloud-storage-interface.js';
-  import './google-drive-provider.js';
-  import { SyncManager } from './sync-manager.js';
+  import '/forked/cloud-storage-interface.js';
+  import '/forked/google-drive-provider.js';
+  import { SyncManager } from '/forked/sync-manager.js';
 
   /* Init markdown-it  */
   const md = markdownIt({
@@ -573,6 +589,13 @@
       return;
     }
 
+    // Save current recipe to localStorage for persistence
+    try {
+      localStorage.setItem('lastViewedRecipe', slug);
+    } catch (err) {
+      console.log('Could not save last viewed recipe:', err);
+    }
+
     const file = entry.getFile ? await entry.getFile() : entry;  // Works for both FileSystemFileHandle and File
     const text = await file.text();
     const { data: fm, content } = matter(text);
@@ -635,6 +658,18 @@
     const match = location.hash.match(/recipe=([\w-]+)/);
     if (match) {
       renderRecipe(match[1]);
+    } else {
+      // No hash present, try to restore last viewed recipe
+      try {
+        const lastRecipe = localStorage.getItem('lastViewedRecipe');
+        if (lastRecipe && slugToFile.has(lastRecipe)) {
+          // Set the URL hash to match the restored recipe
+          window.location.hash = `#recipe=${lastRecipe}`;
+          // renderRecipe will be called automatically by the hashchange event
+        }
+      } catch (err) {
+        console.log('Could not restore last viewed recipe:', err);
+      }
     }
   };
   window.addEventListener('hashchange', route);
@@ -671,7 +706,7 @@
   async function initializeSync() {
     try {
       // Try to load config and initialize sync
-      const { CONFIG } = await import('./config.js');
+      const { CONFIG } = await import('/forked/config.js');
       const success = await syncManager.initProvider('google-drive', { clientId: CONFIG.google.clientId });
       
       if (success) {
@@ -1165,6 +1200,28 @@
     recipesMenu.classList.remove('show');
     settingsMenu.classList.remove('show');
   });
+  
+  // App icon click handler - return to home and clear saved recipe
+  const appIcon = document.querySelector('.app-icon');
+  if (appIcon) {
+    appIcon.addEventListener('click', () => {
+      // Clear the current recipe view
+      const viewer = document.getElementById('viewer');
+      viewer.innerHTML = '<p>Select a recipe from the menu above to get started.</p>';
+      
+      // Clear saved recipe from localStorage
+      try {
+        localStorage.removeItem('lastViewedRecipe');
+      } catch (err) {
+        console.log('Could not clear saved recipe:', err);
+      }
+      
+      // Clear URL hash
+      if (location.hash) {
+        history.pushState('', document.title, window.location.pathname + window.location.search);
+      }
+    });
+  }
   
   // Prevent dropdown closing when clicking inside
   recipesMenu.addEventListener('click', (e) => e.stopPropagation());
