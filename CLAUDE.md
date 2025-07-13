@@ -86,19 +86,19 @@ This design allows easy addition of Dropbox, OneDrive, S3, or any other storage 
 
 ## Testing Requirements
 
-IMPORTANT: Always run tests before committing code changes:
+**CRITICAL: You MUST run tests before committing ANY code changes. No exceptions.**
 
-1. **Run automated tests**:
+1. **Run automated tests** (REQUIRED before every commit):
    ```bash
    npm test
    ```
    This verifies core authentication logic including token expiration and refresh.
 
-2. **For authentication changes**, also run browser tests:
+2. **For authentication changes**, also run browser tests (REQUIRED):
    ```bash
    open tests/auth-tests-standalone.html
    ```
-   Click "Run All Tests" and ensure all pass.
+   Click "Run All Tests" and ensure ALL tests pass.
 
 3. **Test coverage includes**:
    - Token persistence and expiration
@@ -106,7 +106,12 @@ IMPORTANT: Always run tests before committing code changes:
    - Sign-out cleanup
    - API retry logic
 
-Always ensure tests pass before suggesting commits. Tests are lightweight and require no dependencies.
+**DO NOT COMMIT if tests fail.** Always ensure tests pass before suggesting commits. Tests are lightweight and require no dependencies.
+
+**If tests fail:**
+- Fix the failing tests first
+- Re-run tests to confirm they pass
+- Only then proceed with the commit
 
 ## Service Worker Cache Management
 
