@@ -1342,6 +1342,7 @@
     if (debugDiv) {
       debugDiv.innerHTML = `
         <strong>PWA Debug Info:</strong><br>
+        Version: <span id="debug-version">Loading...</span><br>
         Current URL: ${window.location.href}<br>
         Standalone: ${isStandalone}<br>
         Was Installed: ${wasInstalled}<br>
@@ -1351,6 +1352,32 @@
         User Agent: ${navigator.userAgent.substring(0, 50)}...<br>
         <button onclick="window.debugUtils?.clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
       `;
+      
+      // Get version from service worker cache asynchronously
+      (async () => {
+        try {
+          let version = 'Unknown';
+          if ('caches' in window) {
+            const cacheNames = await caches.keys();
+            const recipeCache = cacheNames.find(name => name.startsWith('recipe-app-v'));
+            if (recipeCache) {
+              version = recipeCache.replace('recipe-app-v', '');
+            }
+          }
+          // Update the version in the debug panel
+          const versionSpan = document.getElementById('debug-version');
+          if (versionSpan) {
+            versionSpan.textContent = version;
+          }
+        } catch (err) {
+          console.log('Could not get version from cache:', err);
+          const versionSpan = document.getElementById('debug-version');
+          if (versionSpan) {
+            versionSpan.textContent = 'Error';
+          }
+        }
+      })();
+      
       // Keep it hidden by default - only show when debug toggle is clicked
     } else {
       console.error('Debug div not found!');
