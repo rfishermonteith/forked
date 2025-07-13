@@ -1,4 +1,4 @@
-const VERSION = '0.1.4';
+const VERSION = '0.1.5';
 const CACHE_NAME = `recipe-app-v${VERSION}`;
 const urlsToCache = [
   '/forked/',
@@ -6,6 +6,7 @@ const urlsToCache = [
   '/forked/manifest.json',
   '/forked/icons/icon-192.png',
   '/forked/icons/icon-512.png',
+  '/forked/icons/icon.svg',
   '/forked/sw.js',
   '/forked/google-drive-provider.js',
   '/forked/cloud-storage-interface.js',
