@@ -1,4 +1,4 @@
-const VERSION = '0.1.7';
+const VERSION = '0.1.8';
 const CACHE_NAME = `recipe-app-v${VERSION}`;
 const urlsToCache = [
   '/forked/',
