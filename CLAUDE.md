@@ -83,3 +83,65 @@ This design allows easy addition of Dropbox, OneDrive, S3, or any other storage 
 - `build-config.sh` generates `config.js` from `.env` 
 - Automatic config building in test server
 - Future providers can add their credentials to same `.env` file
+
+## Testing Requirements
+
+**CRITICAL: You MUST run tests before committing ANY code changes. No exceptions.**
+
+1. **Run automated tests** (REQUIRED before every commit):
+   ```bash
+   npm test
+   ```
+   This verifies core authentication logic including token expiration and refresh.
+
+2. **For authentication changes**, also run browser tests (REQUIRED):
+   ```bash
+   open tests/auth-tests-standalone.html
+   ```
+   Click "Run All Tests" and ensure ALL tests pass.
+
+3. **Test coverage includes**:
+   - Token persistence and expiration
+   - Automatic token refresh
+   - Sign-out cleanup
+   - API retry logic
+
+**DO NOT COMMIT if tests fail.** Always ensure tests pass before suggesting commits. Tests are lightweight and require no dependencies.
+
+**If tests fail:**
+- Fix the failing tests first
+- Re-run tests to confirm they pass
+- Only then proceed with the commit
+
+## Service Worker Cache Management
+
+The app uses a service worker for PWA functionality and offline support. When making changes to cached files, **you must update the cache version** to ensure users see the latest changes.
+
+### Cache Busting Process
+
+1. **Update version in `sw.js`**:
+   ```javascript
+   const VERSION = '0.1.X'; // Increment version number
+   ```
+
+2. **Add new resources to cache** (if applicable):
+   ```javascript
+   const urlsToCache = [
+     // Add new files that should be cached
+   ];
+   ```
+
+3. **Commit and deploy** the service worker changes
+
+### When to Bust Cache
+
+- Any changes to `index.html`, JavaScript modules, or CSS
+- New features that affect cached resources
+- Bug fixes in client-side code
+- Changes to manifest.json or icons
+
+### Current Version Tracking
+
+The service worker version should be incremented for each release that affects cached resources. This ensures the old cache is invalidated and new files are downloaded.
+
+**Note**: The service worker automatically handles cache cleanup when the version changes.

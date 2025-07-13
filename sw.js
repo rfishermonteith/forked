@@ -1,4 +1,4 @@
-const VERSION = '0.1.1';
+const VERSION = '0.1.8';
 const CACHE_NAME = `recipe-app-v${VERSION}`;
 const urlsToCache = [
   '/forked/',
@@ -6,7 +6,12 @@ const urlsToCache = [
   '/forked/manifest.json',
   '/forked/icons/icon-192.png',
   '/forked/icons/icon-512.png',
+  '/forked/icons/icon.svg',
   '/forked/sw.js',
+  '/forked/google-drive-provider.js',
+  '/forked/cloud-storage-interface.js',
+  '/forked/sync-manager.js',
+  '/forked/config.js',
   // External dependencies - using CDN URLs from index.html
   'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm',
   'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm',

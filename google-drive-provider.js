@@ -35,45 +35,206 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       callback: '', // Will be set in authenticate()
       error_callback: (error) => {
         console.error('OAuth error:', error);
+        // If popup fails, we'll fallback to redirect flow
+        if (error.type === 'popup_failed_to_open') {
+          console.log('🔄 GoogleDrive: Popup blocked - will use redirect flow');
+          this.useRedirectFlow = true;
+          // Store the error so authenticate() can handle it
+          this.lastAuthError = error;
+        }
       },
     });
+
+    // Detect if we're on mobile or if popups are likely to be blocked
+    this.isMobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    this.useRedirectFlow = this.isMobile; // Default to redirect on mobile
+
+    // Check if we're returning from OAuth redirect
+    await this.handleOAuthRedirect();
 
     // Try to restore saved token
     const savedToken = this.getSavedToken();
     if (savedToken) {
+      console.log('🔐 GoogleDrive: Found saved token in localStorage');
+      
+      // ALWAYS set the token in gapi.client, even if expired
+      // This allows us to attempt refresh
       gapi.client.setToken(savedToken);
-      console.log('Restored saved authentication token');
       
-      // Check if already authenticated (this will validate the token)
-      this.isAuthenticated = await this.checkAuth();
-      
-      if (!this.isAuthenticated) {
-        console.log('Saved token was invalid or expired');
+      if (savedToken.expires_at) {
+        const now = Date.now();
+        const expiresAt = new Date(savedToken.expires_at);
+        const timeUntilExpiry = savedToken.expires_at - now;
+        const minutesUntilExpiry = Math.floor(timeUntilExpiry / (60 * 1000));
+        
+        console.log(`🔐 GoogleDrive: Token expires at ${expiresAt.toLocaleString()}`);
+        console.log(`🔐 GoogleDrive: Time until expiry: ${minutesUntilExpiry} minutes`);
+        
+        if (timeUntilExpiry <= 0) {
+          console.log('🔐 GoogleDrive: ❌ Token is EXPIRED - will attempt refresh on first use');
+          // Set as authenticated to allow refresh attempt
+          this.isAuthenticated = true;
+        } else if (timeUntilExpiry < 5 * 60 * 1000) {
+          console.log('🔐 GoogleDrive: ⚠️  Token expires soon - will auto-refresh on first API call');
+          this.isAuthenticated = true;
+        } else {
+          console.log('🔐 GoogleDrive: ✅ Token is valid and fresh');
+          this.isAuthenticated = true;
+        }
+      } else {
+        console.log('🔐 GoogleDrive: ⚠️  Token has no expiration time - assuming valid');
+        this.isAuthenticated = true;
       }
+      
+      console.log(`🔐 GoogleDrive: Set initial auth state: ${this.isAuthenticated ? 'AUTHENTICATED' : 'NOT AUTHENTICATED'}`);
     } else {
+      console.log('🔐 GoogleDrive: No saved token found - user needs to authenticate');
       this.isAuthenticated = false;
     }
   }
 
   async checkAuth() {
+    console.log('🔍 GoogleDrive: checkAuth() called');
     const token = gapi.client.getToken();
-    if (!token) return false;
+    if (!token) {
+      console.log('🔍 GoogleDrive: No token in gapi.client');
+      return false;
+    }
+    
+    // Check if token is about to expire (within 5 minutes)
+    const savedToken = this.getSavedToken();
+    if (savedToken && savedToken.expires_at) {
+      const timeUntilExpiry = savedToken.expires_at - Date.now();
+      const minutesLeft = Math.floor(timeUntilExpiry / (60 * 1000));
+      
+      if (timeUntilExpiry < 5 * 60 * 1000) { // Less than 5 minutes
+        console.log(`🔍 GoogleDrive: Token expires in ${minutesLeft} minutes - attempting silent refresh...`);
+        return await this.silentRefresh();
+      } else {
+        console.log(`🔍 GoogleDrive: Token is fresh (${minutesLeft} minutes left) - skipping validation`);
+        return true;
+      }
+    }
     
     // Verify token is still valid by making a test API call
+    console.log('🔍 GoogleDrive: Validating token with Google API...');
     try {
       await gapi.client.drive.about.get({ fields: 'user' });
+      console.log('🔍 GoogleDrive: ✅ Token validation successful');
       return true;
     } catch (error) {
-      console.log('Token validation failed:', error);
-      // Clear invalid token
+      console.log('🔍 GoogleDrive: ❌ Token validation failed:', error.message);
+      // Try silent refresh before giving up
+      console.log('🔍 GoogleDrive: Attempting silent refresh as fallback...');
+      const refreshed = await this.silentRefresh();
+      if (refreshed) {
+        console.log('🔍 GoogleDrive: ✅ Silent refresh successful');
+        return true;
+      }
+      // Clear invalid token only after refresh fails
+      console.log('🔍 GoogleDrive: ❌ Silent refresh failed - clearing token');
       gapi.client.setToken('');
       this.clearSavedToken();
+      this.isAuthenticated = false;
       return false;
     }
   }
 
-  async authenticate() {
+  async silentRefresh() {
+    console.log('🔄 GoogleDrive: Starting silent refresh...');
+    
+    // Get saved user email for login_hint
+    const userEmail = this.getSavedUserEmail();
+    
     return new Promise((resolve) => {
+      this.tokenClient.callback = async (resp) => {
+        if (resp.error !== undefined) {
+          console.error('🔄 GoogleDrive: ❌ Silent refresh failed:', resp.error);
+          console.log('🔄 GoogleDrive: This means Google requires user re-authentication');
+          resolve(false);
+          return;
+        }
+        
+        console.log('🔄 GoogleDrive: ✅ Silent refresh successful');
+        console.log('🔄 GoogleDrive: New token received from Google');
+        this.isAuthenticated = true;
+        this.saveToken(resp);
+        
+        // Log the new expiration time
+        const newToken = this.getSavedToken();
+        if (newToken?.expires_at) {
+          const expiresAt = new Date(newToken.expires_at);
+          console.log(`🔄 GoogleDrive: New token expires at ${expiresAt.toLocaleString()}`);
+        }
+        
+        // Update user info in case it changed
+        this.saveUserInfo().catch(error => {
+          console.log('Failed to update user info:', error);
+        });
+        
+        resolve(true);
+      };
+      
+      // Attempt to get a new token without user interaction
+      console.log('🔄 GoogleDrive: Requesting new token from Google (silent)...');
+      const options = { prompt: '' };
+      
+      // Add login_hint if we have a saved user email
+      if (userEmail) {
+        options.login_hint = userEmail;
+        console.log(`🔄 GoogleDrive: Using login_hint: ${userEmail}`);
+      }
+      
+      this.tokenClient.requestAccessToken(options);
+    });
+  }
+
+  /**
+   * Wrapper for API calls that handles token refresh automatically
+   */
+  async withTokenRefresh(apiCall) {
+    console.log('🔁 GoogleDrive: API call with automatic token refresh');
+    try {
+      // First check if token is about to expire
+      const authValid = await this.checkAuth();
+      if (!authValid) {
+        console.log('🔁 GoogleDrive: ❌ Authentication check failed');
+        throw new Error('Authentication required');
+      }
+      
+      console.log('🔁 GoogleDrive: ✅ Authentication valid - making API call');
+      // Make the API call
+      return await apiCall();
+    } catch (error) {
+      // If we get a 401 error, try to refresh the token once
+      if (error.status === 401 && !error._retried) {
+        console.log('🔁 GoogleDrive: ❌ API call failed with 401 - attempting token refresh...');
+        const refreshed = await this.silentRefresh();
+        if (refreshed) {
+          console.log('🔁 GoogleDrive: ✅ Token refreshed - retrying API call');
+          // Mark that we've retried to avoid infinite loops
+          error._retried = true;
+          // Retry the API call
+          return await apiCall();
+        } else {
+          console.log('🔁 GoogleDrive: ❌ Token refresh failed - API call cannot proceed');
+        }
+      }
+      throw error;
+    }
+  }
+
+  async authenticate() {
+    // If we should use redirect flow (mobile or popup failed), use that instead
+    if (this.useRedirectFlow) {
+      console.log('🔄 GoogleDrive: Using redirect flow for mobile/popup-blocked browser');
+      return this.authenticateWithRedirect();
+    }
+
+    // For desktop, try popup flow first
+    return new Promise((resolve) => {
+      let popupAttempted = false;
+      
       this.tokenClient.callback = async (resp) => {
         if (resp.error !== undefined) {
           console.error('Authentication error:', resp.error);
@@ -85,24 +246,154 @@ export class GoogleDriveProvider extends CloudStorageProvider {
         this.isAuthenticated = true;
         
         // Save the token for persistence
-        this.saveToken();
+        this.saveToken(resp);
+        
+        // Get and save user info for future login_hint
+        this.saveUserInfo().catch(error => {
+          console.log('Failed to save user info:', error);
+        });
         
         resolve({ success: true });
       };
       
-      // Check if we already have a valid token
-      const existingToken = gapi.client.getToken();
-      if (existingToken === null) {
-        // First time authentication - request with consent
-        this.tokenClient.requestAccessToken({ 
-          prompt: 'consent',
-          hint: 'Select or create the account you want to use for Recipe Box'
-        });
-      } else {
-        // Try to refresh/reuse existing token
-        this.tokenClient.requestAccessToken({ prompt: '' });
+      // Try to request token
+      try {
+        // Get saved user email for login_hint
+        const userEmail = this.getSavedUserEmail();
+        
+        // Check if we already have a valid token
+        const existingToken = gapi.client.getToken();
+        if (existingToken === null) {
+          // First time authentication - request with consent
+          const options = { 
+            prompt: 'consent',
+            hint: 'Select or create the account you want to use for Recipe Box'
+          };
+          if (userEmail) {
+            options.login_hint = userEmail;
+            console.log(`🔐 GoogleDrive: Using login_hint for auth: ${userEmail}`);
+          }
+          this.tokenClient.requestAccessToken(options);
+        } else {
+          // Try to refresh/reuse existing token
+          const options = { prompt: '' };
+          if (userEmail) {
+            options.login_hint = userEmail;
+          }
+          this.tokenClient.requestAccessToken(options);
+        }
+        popupAttempted = true;
+      } catch (error) {
+        console.error('Failed to request token:', error);
+        resolve({ success: false, error: error });
       }
+      
+      // Check if popup was blocked immediately
+      setTimeout(() => {
+        if (popupAttempted && this.lastAuthError?.type === 'popup_failed_to_open') {
+          console.log('🔄 GoogleDrive: Popup was blocked, redirecting now...');
+          this.authenticateWithRedirect();
+        }
+      }, 100);
     });
+  }
+
+  /**
+   * Authenticate using redirect flow (mobile-friendly)
+   */
+  async authenticateWithRedirect() {
+    console.log('🔄 GoogleDrive: Using redirect flow for authentication');
+    
+    // Build the OAuth URL manually
+    const redirectUri = window.location.origin + window.location.pathname;
+    console.log('🔄 GoogleDrive: Redirect URI:', redirectUri);
+    
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', this.clientId);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'token');
+    authUrl.searchParams.set('scope', this.scopes);
+    authUrl.searchParams.set('state', 'google_drive_auth');
+    authUrl.searchParams.set('include_granted_scopes', 'true');
+    
+    // Add login_hint if we have a saved user email
+    const userEmail = this.getSavedUserEmail();
+    if (userEmail) {
+      authUrl.searchParams.set('login_hint', userEmail);
+      console.log(`🔄 GoogleDrive: Using login_hint for redirect: ${userEmail}`);
+    }
+    
+    console.log('🔄 GoogleDrive: OAuth URL:', authUrl.toString());
+    console.log('🔄 GoogleDrive: Redirecting to Google OAuth in 1 second...');
+    
+    // Store a flag to know we're in auth flow
+    sessionStorage.setItem('google_drive_auth_in_progress', 'true');
+    
+    // Small delay to ensure console logs are visible
+    setTimeout(() => {
+      console.log('🔄 GoogleDrive: Redirecting now!');
+      window.location.href = authUrl.toString();
+    }, 1000);
+    
+    // This return won't be reached, but needed for TypeScript
+    return { success: false, error: 'Redirect in progress' };
+  }
+
+  /**
+   * Handle OAuth redirect callback
+   */
+  async handleOAuthRedirect() {
+    // Check if we're returning from OAuth
+    const urlParams = new URLSearchParams(window.location.hash.substring(1));
+    const accessToken = urlParams.get('access_token');
+    const state = urlParams.get('state');
+    const error = urlParams.get('error');
+    
+    if (state === 'google_drive_auth' && sessionStorage.getItem('google_drive_auth_in_progress')) {
+      console.log('🔄 GoogleDrive: Handling OAuth redirect response');
+      
+      // Clear the auth flag
+      sessionStorage.removeItem('google_drive_auth_in_progress');
+      
+      if (error) {
+        console.error('🔄 GoogleDrive: OAuth error:', error);
+        // Clean up URL
+        history.replaceState(null, '', window.location.pathname);
+        return;
+      }
+      
+      if (accessToken) {
+        console.log('🔄 GoogleDrive: ✅ OAuth redirect successful');
+        
+        // Create token object
+        const expiresIn = parseInt(urlParams.get('expires_in') || '3600');
+        const tokenResponse = {
+          access_token: accessToken,
+          expires_in: expiresIn
+        };
+        
+        // Save the token
+        this.saveToken(tokenResponse);
+        
+        // Set token in gapi client
+        gapi.client.setToken({
+          access_token: accessToken,
+          expires_at: Date.now() + (expiresIn * 1000)
+        });
+        
+        this.isAuthenticated = true;
+        
+        // Clean up URL hash
+        history.replaceState(null, '', window.location.pathname);
+        
+        console.log('🔄 GoogleDrive: Authentication complete via redirect');
+        
+        // Get and save user info for future login_hint
+        this.saveUserInfo().catch(error => {
+          console.log('Failed to save user info:', error);
+        });
+      }
+    }
   }
 
   async signOut() {
@@ -117,8 +408,9 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       gapi.client.setToken('');
       this.isAuthenticated = false;
       
-      // Clear saved token
+      // Clear saved token and user info
       this.clearSavedToken();
+      this.clearSavedUserInfo();
       
       console.log('User signed out successfully');
     }
@@ -129,18 +421,20 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       throw new Error('No recipe folder selected. Please select a folder first.');
     }
     
-    const response = await gapi.client.drive.files.list({
-      q: `'${this.recipeFolderId}' in parents and name contains '.md' and trashed=false`,
-      fields: 'files(id, name, modifiedTime, size)',
-      orderBy: 'modifiedTime desc'
-    });
+    return this.withTokenRefresh(async () => {
+      const response = await gapi.client.drive.files.list({
+        q: `'${this.recipeFolderId}' in parents and name contains '.md' and trashed=false`,
+        fields: 'files(id, name, modifiedTime, size)',
+        orderBy: 'modifiedTime desc'
+      });
 
-    return response.result.files.map(file => ({
-      id: file.id,
-      name: file.name,
-      lastModified: new Date(file.modifiedTime),
-      size: parseInt(file.size || 0)
-    }));
+      return response.result.files.map(file => ({
+        id: file.id,
+        name: file.name,
+        lastModified: new Date(file.modifiedTime),
+        size: parseInt(file.size || 0)
+      }));
+    });
   }
 
   /**
@@ -535,14 +829,21 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   }
 
   // Token persistence methods
-  saveToken() {
-    const token = gapi.client.getToken();
+  saveToken(tokenResponse = null) {
+    const token = tokenResponse || gapi.client.getToken();
     if (token) {
       // Store token with expiry time
+      const expiresIn = tokenResponse?.expires_in || 3600; // Default to 1 hour if not provided
+      const expiresAt = Date.now() + (expiresIn * 1000);
       const tokenData = {
         access_token: token.access_token,
-        expires_at: Date.now() + (token.expires_in * 1000)
+        expires_at: expiresAt
       };
+      
+      console.log(`💾 GoogleDrive: Saving token to localStorage`);
+      console.log(`💾 GoogleDrive: Token expires in ${expiresIn} seconds (${Math.floor(expiresIn/60)} minutes)`);
+      console.log(`💾 GoogleDrive: Token expires at ${new Date(expiresAt).toLocaleString()}`);
+      
       // Use localStorage for better persistence across browser sessions
       localStorage.setItem('google_drive_token', JSON.stringify(tokenData));
     }
@@ -553,25 +854,33 @@ export class GoogleDriveProvider extends CloudStorageProvider {
       // Check both localStorage and sessionStorage for backward compatibility
       const savedData = localStorage.getItem('google_drive_token') || 
                        sessionStorage.getItem('google_drive_token');
-      if (!savedData) return null;
+      if (!savedData) {
+        console.log('📖 GoogleDrive: No saved token found in storage');
+        return null;
+      }
       
       const tokenData = JSON.parse(savedData);
+      console.log('📖 GoogleDrive: Found saved token data');
       
-      // Check if token is expired
-      if (Date.now() >= tokenData.expires_at) {
-        localStorage.removeItem('google_drive_token');
-        sessionStorage.removeItem('google_drive_token');
-        return null;
+      // DON'T remove expired tokens here - let checkAuth/silentRefresh handle it
+      // This allows us to attempt refresh with the expired token
+      if (tokenData.expires_at && Date.now() >= tokenData.expires_at) {
+        console.log('📖 GoogleDrive: Saved token is expired (will attempt refresh)');
+        // Still return the expired token so we can try to refresh it
       }
       
       // Migrate from sessionStorage to localStorage if needed
       if (!localStorage.getItem('google_drive_token') && sessionStorage.getItem('google_drive_token')) {
+        console.log('📖 GoogleDrive: Migrating token from sessionStorage to localStorage');
         localStorage.setItem('google_drive_token', savedData);
       }
       
-      return { access_token: tokenData.access_token };
+      return { 
+        access_token: tokenData.access_token,
+        expires_at: tokenData.expires_at
+      };
     } catch (error) {
-      console.error('Error retrieving saved token:', error);
+      console.error('📖 GoogleDrive: Error retrieving saved token:', error);
       return null;
     }
   }
@@ -579,6 +888,39 @@ export class GoogleDriveProvider extends CloudStorageProvider {
   clearSavedToken() {
     localStorage.removeItem('google_drive_token');
     sessionStorage.removeItem('google_drive_token');
+  }
+
+  /**
+   * Save user info (email) for login_hint
+   */
+  async saveUserInfo() {
+    try {
+      const response = await gapi.client.drive.about.get({
+        fields: 'user(emailAddress)'
+      });
+      
+      if (response.result.user && response.result.user.emailAddress) {
+        const email = response.result.user.emailAddress;
+        localStorage.setItem('google_drive_user_email', email);
+        console.log(`💾 GoogleDrive: Saved user email for future login_hint: ${email}`);
+      }
+    } catch (error) {
+      console.error('Failed to get user info:', error);
+    }
+  }
+
+  /**
+   * Get saved user email for login_hint
+   */
+  getSavedUserEmail() {
+    return localStorage.getItem('google_drive_user_email');
+  }
+
+  /**
+   * Clear saved user info
+   */
+  clearSavedUserInfo() {
+    localStorage.removeItem('google_drive_user_email');
   }
 }
 
