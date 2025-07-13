@@ -1337,7 +1337,7 @@
     const wasInstalled = await get('appInstalled');
     const isStandalone = isRunningStandalone();
     
-    // Show debug info on screen
+    // Prepare debug info for when debug toggle is clicked
     const debugDiv = document.getElementById('debug-info');
     if (debugDiv) {
       debugDiv.innerHTML = `
@@ -1351,10 +1351,7 @@
         User Agent: ${navigator.userAgent.substring(0, 50)}...<br>
         <button onclick="window.debugUtils?.clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
       `;
-      debugDiv.style.display = 'block';
-      
-      // Hide debug after 10 seconds
-      setTimeout(() => debugDiv.style.display = 'none', 10000);
+      // Keep it hidden by default - only show when debug toggle is clicked
     } else {
       console.error('Debug div not found!');
     }
@@ -1364,13 +1361,11 @@
       if (installBanner) {
         installBanner.classList.add('hidden');
         installBanner.style.display = 'none'; // Force hide with CSS
-        if (debugDiv) debugDiv.innerHTML += `<br><strong>Banner Hidden:</strong> YES`;
       } else {
-        if (debugDiv) debugDiv.innerHTML += `<br><strong>ERROR:</strong> Banner element not found!`;
+        console.log('ERROR: Banner element not found!');
       }
     } else {
       console.log('Running in browser - install banner may be shown');
-      if (debugDiv) debugDiv.innerHTML += `<br><strong>Banner:</strong> Should be visible`;
     }
   }
   
