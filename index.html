@@ -1,436 +1,436 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A local-first recipe management app">
-<meta name="theme-color" content="#2c3e50">
-<link rel="manifest" href="/forked/manifest.json">
-<link rel="icon" href="/forked/icons/icon-192.png" type="image/png">
-<link rel="apple-touch-icon" href="/forked/icons/icon-192.png">
-<title>Recipe Box</title>
-<style>
-  body {
-    font: 16px/1.5 system-ui, sans-serif;
-    margin: 0;
-    padding: 0 2rem;
-  }
-  header {
-    margin: 2rem 0 1rem;
-  }
-  /* Recipe content lists - with bullets */
-  #viewer ul {
-    list-style: disc;
-    padding-left: 1.5rem;
-    margin: 1rem 0;
-  }
-  li {
-    margin: .25rem 0;
-  }
-  a {
-    text-decoration: none;
-    color: #0366d6;
-  }
-  a:hover {
-    text-decoration: underline;
-  }
-  h1 {
-    margin: 0 0 1rem;
-    font-size: 1.8rem;
-  }
-  img {
-    max-width: 100%;
-    height: auto;
-    display: block;
-    margin: 1rem 0;
-  }
-  
-  /* Recipe image styling */
-  .recipe-image {
-    width: 100%;
-    max-width: 600px;
-    height: auto;
-    object-fit: contain;
-    border-radius: 8px;
-    margin: 0 auto 2rem auto;
-    display: block;
-  }
-  
-  @media (max-width: 768px) {
-    .recipe-image {
-      max-width: 100%;
-    }
-  }
-  .pick {
-    margin: 1.5rem 0;
-  }
-  .hidden {
-    display: none;
-  }
-  .install-banner {
-    background: #2c3e50;
-    color: white;
-    padding: 1rem 2rem;
-    margin: 0 -2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-  }
-  .install-banner button {
-    background: white;
-    color: #2c3e50;
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: bold;
-  }
-  .install-banner button:hover {
-    opacity: 0.9;
-  }
-  .debug-info {
-    position: fixed;
-    bottom: 10px;
-    left: 10px;
-    background: rgba(0,0,0,0.8);
-    color: white;
-    padding: 10px;
-    font-size: 12px;
-    border-radius: 4px;
-    max-width: 300px;
-    z-index: 1000;
-  }
-  .sync-panel {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 1rem;
-    margin: 1rem 0;
-  }
-  .sync-status {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-  .sync-status.connected {
-    color: #28a745;
-  }
-  .sync-status.disconnected {
-    color: #dc3545;
-  }
-  .sync-buttons {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-  .sync-buttons button {
-    padding: 0.5rem 1rem;
-    border: none;
-    border-radius: 4px;
-    background: #007bff;
-    color: white;
-    cursor: pointer;
-    font-size: 14px;
-  }
-  .sync-buttons button:hover {
-    background: #0056b3;
-  }
-  .sync-buttons button:disabled {
-    background: #6c757d;
-    cursor: not-allowed;
-  }
-  .sync-progress {
-    margin-top: 0.5rem;
-    padding: 0.5rem;
-    background: #e9ecef;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-  .folder-selection {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
-    border-radius: 4px;
-  }
-  .folder-list {
-    max-height: 300px;
-    overflow-y: auto;
-    margin: 0.5rem 0;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    background: white;
-  }
-  .folder-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0.5rem;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    margin: 0.25rem 0;
-    cursor: pointer;
-  }
-  .folder-item:hover {
-    background: #f8f9fa;
-  }
-  .folder-item.selected {
-    background: #d1ecf1;
-    border-color: #bee5eb;
-  }
-  .folder-info {
-    flex: 1;
-  }
-  .folder-badges {
-    display: flex;
-    gap: 0.25rem;
-  }
-  .folder-badge {
-    padding: 0.1rem 0.3rem;
-    font-size: 0.7rem;
-    border-radius: 2px;
-    color: white;
-  }
-  .folder-badge.shared {
-    background: #28a745;
-  }
-  .folder-badge.owned {
-    background: #007bff;
-  }
-  .share-form {
-    margin-top: 1rem;
-    padding: 1rem;
-    background: #f8f9fa;
-    border-radius: 4px;
-  }
-  .share-form input {
-    padding: 0.5rem;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    margin-right: 0.5rem;
-    width: 200px;
-  }
-  
-  /* Minimalist Menu Bar */
-  .menu-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 1rem 0;
-    border-bottom: 1px solid #dee2e6;
-    margin-bottom: 2rem;
-  }
-  
-  .menu-left {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .menu-right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-  
-  .app-icon {
-    width: 28px;
-    height: 28px;
-    cursor: pointer;
-    transition: opacity 0.2s ease;
-  }
-  
-  .app-icon:hover {
-    opacity: 0.8;
-  }
-  
-  .icon-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0.5rem;
-    border-radius: 4px;
-    font-size: 18px;
-    transition: background-color 0.2s ease;
-  }
-  
-  .icon-button:hover {
-    background-color: #f0f0f0;
-  }
-  
-  .menu-dropdown {
-    position: relative;
-    display: inline-block;
-  }
-  
-  .menu-button {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 14px;
-  }
-  
-  .menu-button:hover {
-    background: #e9ecef;
-  }
-  
-  .menu-content {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    background: white;
-    border: 1px solid #dee2e6;
-    border-radius: 4px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    z-index: 1000;
-    min-width: 250px;
-    max-height: 400px;
-    overflow-y: auto;
-  }
-  
-  /* Right-aligned dropdowns for menu-right section */
-  .menu-right .menu-content {
-    left: auto;
-    right: 0;
-  }
-  
-  .menu-content.show {
-    display: block;
-  }
-  
-  .menu-section {
-    padding: 1rem;
-    border-bottom: 1px solid #f8f9fa;
-  }
-  
-  .menu-section:last-child {
-    border-bottom: none;
-  }
-  
-  .menu-section h4 {
-    margin: 0 0 0.5rem 0;
-    font-size: 14px;
-    color: #6c757d;
-  }
-  
-  .debug-link {
-    background: none;
-    border: none;
-    color: #6c757d;
-    cursor: pointer;
-    font-size: 14px;
-    padding: 0.5rem;
-  }
-  
-  .debug-link:hover {
-    color: #495057;
-  }
-  
-  .recipe-item {
-    padding: 0.5rem;
-    cursor: pointer;
-    border-bottom: 1px solid #f8f9fa;
-  }
-  
-  .recipe-item:hover {
-    background: #f8f9fa;
-  }
-  
-  .recipe-item:last-child {
-    border-bottom: none;
-  }
-</style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="A local-first recipe management app">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="manifest" href="/forked/manifest.json">
+    <link rel="icon" href="/forked/icons/icon-192.png" type="image/png">
+    <link rel="apple-touch-icon" href="/forked/icons/icon-192.png">
+    <title>Recipe Box</title>
+    <style>
+        body {
+          font: 16px/1.5 system-ui, sans-serif;
+          margin: 0;
+          padding: 0 2rem;
+        }
+        header {
+          margin: 2rem 0 1rem;
+        }
+        /* Recipe content lists - with bullets */
+        #viewer ul {
+          list-style: disc;
+          padding-left: 1.5rem;
+          margin: 1rem 0;
+        }
+        li {
+          margin: .25rem 0;
+        }
+        a {
+          text-decoration: none;
+          color: #0366d6;
+        }
+        a:hover {
+          text-decoration: underline;
+        }
+        h1 {
+          margin: 0 0 1rem;
+          font-size: 1.8rem;
+        }
+        img {
+          max-width: 100%;
+          height: auto;
+          display: block;
+          margin: 1rem 0;
+        }
+
+        /* Recipe image styling */
+        .recipe-image {
+          width: 100%;
+          max-width: 600px;
+          height: auto;
+          object-fit: contain;
+          border-radius: 8px;
+          margin: 0 auto 2rem auto;
+          display: block;
+        }
+
+        @media (max-width: 768px) {
+          .recipe-image {
+            max-width: 100%;
+          }
+        }
+        .pick {
+          margin: 1.5rem 0;
+        }
+        .hidden {
+          display: none;
+        }
+        .install-banner {
+          background: #2c3e50;
+          color: white;
+          padding: 1rem 2rem;
+          margin: 0 -2rem;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 1rem;
+        }
+        .install-banner button {
+          background: white;
+          color: #2c3e50;
+          border: none;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          cursor: pointer;
+          font-weight: bold;
+        }
+        .install-banner button:hover {
+          opacity: 0.9;
+        }
+        .debug-info {
+          position: fixed;
+          bottom: 10px;
+          left: 10px;
+          background: rgba(0,0,0,0.8);
+          color: white;
+          padding: 10px;
+          font-size: 12px;
+          border-radius: 4px;
+          max-width: 300px;
+          z-index: 1000;
+        }
+        .sync-panel {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          border-radius: 8px;
+          padding: 1rem;
+          margin: 1rem 0;
+        }
+        .sync-status {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          margin-bottom: 0.5rem;
+        }
+        .sync-status.connected {
+          color: #28a745;
+        }
+        .sync-status.disconnected {
+          color: #dc3545;
+        }
+        .sync-buttons {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+        .sync-buttons button {
+          padding: 0.5rem 1rem;
+          border: none;
+          border-radius: 4px;
+          background: #007bff;
+          color: white;
+          cursor: pointer;
+          font-size: 14px;
+        }
+        .sync-buttons button:hover {
+          background: #0056b3;
+        }
+        .sync-buttons button:disabled {
+          background: #6c757d;
+          cursor: not-allowed;
+        }
+        .sync-progress {
+          margin-top: 0.5rem;
+          padding: 0.5rem;
+          background: #e9ecef;
+          border-radius: 4px;
+          font-size: 14px;
+        }
+        .folder-selection {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #fff3cd;
+          border: 1px solid #ffeaa7;
+          border-radius: 4px;
+        }
+        .folder-list {
+          max-height: 300px;
+          overflow-y: auto;
+          margin: 0.5rem 0;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+          background: white;
+        }
+        .folder-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 0.5rem;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+          margin: 0.25rem 0;
+          cursor: pointer;
+        }
+        .folder-item:hover {
+          background: #f8f9fa;
+        }
+        .folder-item.selected {
+          background: #d1ecf1;
+          border-color: #bee5eb;
+        }
+        .folder-info {
+          flex: 1;
+        }
+        .folder-badges {
+          display: flex;
+          gap: 0.25rem;
+        }
+        .folder-badge {
+          padding: 0.1rem 0.3rem;
+          font-size: 0.7rem;
+          border-radius: 2px;
+          color: white;
+        }
+        .folder-badge.shared {
+          background: #28a745;
+        }
+        .folder-badge.owned {
+          background: #007bff;
+        }
+        .share-form {
+          margin-top: 1rem;
+          padding: 1rem;
+          background: #f8f9fa;
+          border-radius: 4px;
+        }
+        .share-form input {
+          padding: 0.5rem;
+          border: 1px solid #ced4da;
+          border-radius: 4px;
+          margin-right: 0.5rem;
+          width: 200px;
+        }
+
+        /* Minimalist Menu Bar */
+        .menu-bar {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 1rem 0;
+          border-bottom: 1px solid #dee2e6;
+          margin-bottom: 2rem;
+        }
+
+        .menu-left {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .menu-right {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+        }
+
+        .app-icon {
+          width: 28px;
+          height: 28px;
+          cursor: pointer;
+          transition: opacity 0.2s ease;
+        }
+
+        .app-icon:hover {
+          opacity: 0.8;
+        }
+
+        .icon-button {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0.5rem;
+          border-radius: 4px;
+          font-size: 18px;
+          transition: background-color 0.2s ease;
+        }
+
+        .icon-button:hover {
+          background-color: #f0f0f0;
+        }
+
+        .menu-dropdown {
+          position: relative;
+          display: inline-block;
+        }
+
+        .menu-button {
+          background: #f8f9fa;
+          border: 1px solid #dee2e6;
+          padding: 0.5rem 1rem;
+          border-radius: 4px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          font-size: 14px;
+        }
+
+        .menu-button:hover {
+          background: #e9ecef;
+        }
+
+        .menu-content {
+          display: none;
+          position: absolute;
+          top: 100%;
+          left: 0;
+          background: white;
+          border: 1px solid #dee2e6;
+          border-radius: 4px;
+          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+          z-index: 1000;
+          min-width: 250px;
+          max-height: 400px;
+          overflow-y: auto;
+        }
+
+        /* Right-aligned dropdowns for menu-right section */
+        .menu-right .menu-content {
+          left: auto;
+          right: 0;
+        }
+
+        .menu-content.show {
+          display: block;
+        }
+
+        .menu-section {
+          padding: 1rem;
+          border-bottom: 1px solid #f8f9fa;
+        }
+
+        .menu-section:last-child {
+          border-bottom: none;
+        }
+
+        .menu-section h4 {
+          margin: 0 0 0.5rem 0;
+          font-size: 14px;
+          color: #6c757d;
+        }
+
+        .debug-link {
+          background: none;
+          border: none;
+          color: #6c757d;
+          cursor: pointer;
+          font-size: 14px;
+          padding: 0.5rem;
+        }
+
+        .debug-link:hover {
+          color: #495057;
+        }
+
+        .recipe-item {
+          padding: 0.5rem;
+          cursor: pointer;
+          border-bottom: 1px solid #f8f9fa;
+        }
+
+        .recipe-item:hover {
+          background: #f8f9fa;
+        }
+
+        .recipe-item:last-child {
+          border-bottom: none;
+        }
+    </style>
 </head>
 <body>
 <div id="install-banner" class="install-banner hidden">
-  <span>Install Recipe Box for easy access</span>
-  <button id="install-btn">Install</button>
+    <span>Install Recipe Box for easy access</span>
+    <button id="install-btn">Install</button>
 </div>
 <!-- Minimalist Menu Bar -->
 <nav class="menu-bar">
-  <!-- Left side: App Icon (opens recipes) -->
-  <div class="menu-left">
-    <div class="menu-dropdown">
-      <img src="/forked/icons/icon.svg" alt="Recipe Box" class="app-icon" id="app-icon-recipes">
-      <div class="menu-content" id="recipes-menu">
-        <div class="menu-section">
-          <div id="recipe-list">
-            <!-- Recipes will be populated here -->
-          </div>
+    <!-- Left side: App Icon (opens recipes) -->
+    <div class="menu-left">
+        <div class="menu-dropdown">
+            <img src="/forked/icons/icon.svg" alt="Recipe Box" class="app-icon" id="app-icon-recipes">
+            <div class="menu-content" id="recipes-menu">
+                <div class="menu-section">
+                    <div id="recipe-list">
+                        <!-- Recipes will be populated here -->
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
     </div>
-  </div>
 
-  <!-- Right side: Debug and Settings -->
-  <div class="menu-right">
-    <!-- Debug Toggle -->
-    <button id="debug-toggle" class="icon-button" title="Debug Info">🔧</button>
+    <!-- Right side: Debug and Settings -->
+    <div class="menu-right">
+        <!-- Debug Toggle -->
+        <button id="debug-toggle" class="icon-button" title="Debug Info">🔧</button>
 
-    <!-- Settings Dropdown -->
-    <div class="menu-dropdown">
-      <button class="icon-button" id="settings-menu-btn" title="Settings">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
-        </svg>
-      </button>
-      <div class="menu-content" id="settings-menu">
-        <!-- Google Drive Sync Section -->
-        <div class="menu-section">
-          <h4>Cloud Sync</h4>
-          <div class="sync-status disconnected" id="sync-status">
-            <span id="sync-status-text">Not connected to cloud storage</span>
-          </div>
-          <div class="sync-buttons">
-            <button id="sync-connect-btn">Connect to Google Drive</button>
-            <button id="sync-now-btn" disabled>Sync Now</button>
-            <button id="sync-disconnect-btn" disabled>Disconnect</button>
-          </div>
-          <div class="sync-progress hidden" id="sync-progress">
-            <div id="sync-progress-text">Ready to sync</div>
-          </div>
+        <!-- Settings Dropdown -->
+        <div class="menu-dropdown">
+            <button class="icon-button" id="settings-menu-btn" title="Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                </svg>
+            </button>
+            <div class="menu-content" id="settings-menu">
+                <!-- Google Drive Sync Section -->
+                <div class="menu-section">
+                    <h4>Cloud Sync</h4>
+                    <div class="sync-status disconnected" id="sync-status">
+                        <span id="sync-status-text">Not connected to cloud storage</span>
+                    </div>
+                    <div class="sync-buttons">
+                        <button id="sync-connect-btn">Connect to Google Drive</button>
+                        <button id="sync-now-btn" disabled>Sync Now</button>
+                        <button id="sync-disconnect-btn" disabled>Disconnect</button>
+                    </div>
+                    <div class="sync-progress hidden" id="sync-progress">
+                        <div id="sync-progress-text">Ready to sync</div>
+                    </div>
+                </div>
+
+                <!-- Local Files Section -->
+                <div class="menu-section">
+                    <h4>Local Files</h4>
+                    <button class="pick" id="pickDir">Open recipe folder</button>
+                </div>
+            </div>
         </div>
-        
-        <!-- Local Files Section -->
-        <div class="menu-section">
-          <h4>Local Files</h4>
-          <button class="pick" id="pickDir">Open recipe folder</button>
-        </div>
-      </div>
     </div>
-  </div>
 </nav>
 
 <!-- Hidden Folder Selection UI (shown when needed) -->
 <div class="folder-selection hidden" id="folder-selection">
-  <h3>Select Recipe Folder</h3>
-  <p>Choose a folder to store your recipes. You can select an existing shared folder or create a new one.</p>
-  
-  <div class="sync-buttons">
-    <button id="refresh-folders-btn">Refresh Folders</button>
-    <button id="create-folder-btn">Create New Folder</button>
-    <button id="select-folder-btn" disabled>Use Selected Folder</button>
-  </div>
-  
-  <div class="folder-list" id="folder-list">
-    <div>Loading folders...</div>
-  </div>
-  
-  <div class="share-form hidden" id="share-form">
-    <h4>Share Selected Folder</h4>
-    <p>Share this folder with your partner so you can both access the same recipes.</p>
-    <input type="email" id="share-email" placeholder="partner@example.com">
-    <button id="share-folder-btn">Share Folder</button>
-    <div id="share-result"></div>
-  </div>
+    <h3>Select Recipe Folder</h3>
+    <p>Choose a folder to store your recipes. You can select an existing shared folder or create a new one.</p>
+
+    <div class="sync-buttons">
+        <button id="refresh-folders-btn">Refresh Folders</button>
+        <button id="create-folder-btn">Create New Folder</button>
+        <button id="select-folder-btn" disabled>Use Selected Folder</button>
+    </div>
+
+    <div class="folder-list" id="folder-list">
+        <div>Loading folders...</div>
+    </div>
+
+    <div class="share-form hidden" id="share-form">
+        <h4>Share Selected Folder</h4>
+        <p>Share this folder with your partner so you can both access the same recipes.</p>
+        <input type="email" id="share-email" placeholder="partner@example.com">
+        <button id="share-folder-btn">Share Folder</button>
+        <div id="share-result"></div>
+    </div>
 </div>
 
 <article id="viewer"></article>
@@ -438,1041 +438,1040 @@
 <div id="debug-info" class="debug-info" style="display: none;"></div>
 
 <script type="module">
-  // IMPORTS
-  import matter from 'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm';
-  import markdownIt from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
-  import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3/+esm';
-  import { get, set, clear } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
-  
-  // Import cloud sync modules
-  import '/forked/cloud-storage-interface.js';
-  import '/forked/google-drive-provider.js';
-  import { SyncManager } from '/forked/sync-manager.js';
+    // IMPORTS
+    import matter from 'https://cdn.jsdelivr.net/npm/gray-matter@4/+esm';
+    import markdownIt from 'https://cdn.jsdelivr.net/npm/markdown-it@14/+esm';
+    import DOMPurify from 'https://cdn.jsdelivr.net/npm/dompurify@3/+esm';
+    import { get, set, clear } from 'https://cdn.jsdelivr.net/npm/idb-keyval@6/+esm';
 
-  // CONSTANTS
-  const SYNC_PROGRESS_HIDE_DELAY = 3000;
-  const PWA_INSTALL_DELAY = 10000;
-  const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
-  const DEFAULT_RECIPE_FOLDER_NAME = 'RecipeBox';
-  const STORAGE_KEYS = {
-    RECIPE_DIR_HANDLE: 'recipeDirHandle',
-    RECIPE_DATA: 'recipeData',
-    IMAGE_DATA: 'imageData',
-    LAST_SYNC_TIME: 'lastSyncTime',
-    LAST_VIEWED_RECIPE: 'lastViewedRecipe',
-    APP_INSTALLED: 'appInstalled',
-    SELECTED_RECIPE_FOLDER: 'selectedRecipeFolderId',
-    GOOGLE_AUTH_IN_PROGRESS: 'google_drive_auth_in_progress'
-  };
-  const FILE_EXTENSIONS = {
-    MARKDOWN: '.md',
-    IMAGES: /\.(jpg|jpeg|png|webp)$/i
-  };
-  
-  // INITIALIZATION
-  const md = markdownIt({
-    html: true,
-    linkify: true,
-    typographer: true
-  });
+    // Import cloud sync modules
+    import '/forked/cloud-storage-interface.js';
+    import '/forked/google-drive-provider.js';
+    import { SyncManager } from '/forked/sync-manager.js';
 
-  // GLOBAL STATE
-  let dirHandle = null;
-  const slugToFile = new Map();
-  const slugToImage = new Map();
-  const syncManager = new SyncManager();
-  let syncEnabled = false;
+    // CONSTANTS
+    const SYNC_PROGRESS_HIDE_DELAY = 3000;
+    const PWA_INSTALL_DELAY = 10000;
+    const TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const DEFAULT_RECIPE_FOLDER_NAME = 'RecipeBox';
+    const STORAGE_KEYS = {
+      RECIPE_DIR_HANDLE: 'recipeDirHandle',
+      RECIPE_DATA: 'recipeData',
+      IMAGE_DATA: 'imageData',
+      LAST_SYNC_TIME: 'lastSyncTime',
+      LAST_VIEWED_RECIPE: 'lastViewedRecipe',
+      APP_INSTALLED: 'appInstalled',
+      SELECTED_RECIPE_FOLDER: 'selectedRecipeFolderId',
+      GOOGLE_AUTH_IN_PROGRESS: 'google_drive_auth_in_progress'
+    };
+    const FILE_EXTENSIONS = {
+      MARKDOWN: '.md',
+      IMAGES: /\.(jpg|jpeg|png|webp)$/i
+    };
 
-  // DOM REFERENCES
-  const UI = {
-    // Main UI elements
-    pickBtn: document.getElementById('pickDir'),
-    recipeListDiv: document.getElementById('recipe-list'),
-    viewer: document.getElementById('viewer'),
-    
-    // Sync UI elements
-    syncStatus: document.getElementById('sync-status'),
-    syncStatusText: document.getElementById('sync-status-text'),
-    syncConnectBtn: document.getElementById('sync-connect-btn'),
-    syncNowBtn: document.getElementById('sync-now-btn'),
-    syncDisconnectBtn: document.getElementById('sync-disconnect-btn'),
-    syncProgress: document.getElementById('sync-progress'),
-    syncProgressText: document.getElementById('sync-progress-text'),
-    
-    // Folder selection UI elements
-    folderSelection: document.getElementById('folder-selection'),
-    folderList: document.getElementById('folder-list'),
-    refreshFoldersBtn: document.getElementById('refresh-folders-btn'),
-    createFolderBtn: document.getElementById('create-folder-btn'),
-    selectFolderBtn: document.getElementById('select-folder-btn'),
-    shareForm: document.getElementById('share-form'),
-    shareEmailInput: document.getElementById('share-email'),
-    shareFolderBtn: document.getElementById('share-folder-btn'),
-    shareResult: document.getElementById('share-result'),
-    
-    // Menu and navigation elements
-    appIconRecipes: document.getElementById('app-icon-recipes'),
-    recipesMenu: document.getElementById('recipes-menu'),
-    settingsMenuBtn: document.getElementById('settings-menu-btn'),
-    settingsMenu: document.getElementById('settings-menu'),
-    debugToggle: document.getElementById('debug-toggle'),
-    debugInfo: document.getElementById('debug-info'),
-    
-    // PWA elements
-    installBanner: document.getElementById('install-banner'),
-    installBtn: document.getElementById('install-btn')
-  };
-
-  // UTILITY FUNCTIONS
-  const slugify = (s) =>
-    s.toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-  // RECIPE MANAGEMENT FUNCTIONS
-  const processRecipeFile = (slug, file, source) => {
-    processRecipeFileWithImage(slug, file, null, source);
-  };
-  
-  const processRecipeFileWithImage = (slug, file, imageFile, source) => {
-    slugToFile.set(slug, file);
-    if (imageFile) {
-      slugToImage.set(slug, imageFile);
-    }
-    
-    // Create recipe item element
-    const item = document.createElement('div');
-    item.className = 'recipe-item';
-    
-    const icon = source === 'cloud' ? '☁️ ' : (source === 'local' ? '📁 ' : '');
-    const fileName = file.name || file;
-    const displayName = fileName.replace(FILE_EXTENSIONS.MARKDOWN, '');
-    
-    item.textContent = `${icon}${displayName}`;
-    item.addEventListener('click', () => {
-      window.location.hash = `#recipe=${slug}`;
-      UI.recipesMenu.classList.remove('show');
+    // INITIALIZATION
+    const md = markdownIt({
+      html: true,
+      linkify: true,
+      typographer: true
     });
-    
-    UI.recipeListDiv.appendChild(item);
-  };
 
-  const renderIndex = async () => {
-    UI.recipeListDiv.innerHTML = '';
-    slugToFile.clear();
-    slugToImage.clear();
-    
-    // First priority: Try to load from synced recipes (IndexedDB)
-    const syncedRecipes = await get(STORAGE_KEYS.RECIPE_DATA) || [];
-    const syncedImages = await get(STORAGE_KEYS.IMAGE_DATA) || [];
-    
-    if (syncedRecipes.length > 0) {
-      console.log(`Loading ${syncedRecipes.length} synced recipes`);
-      
-      // Create a map of images by base name for quick lookup
-      const imageMap = new Map();
-      for (const image of syncedImages) {
-        const baseName = image.name.replace(FILE_EXTENSIONS.IMAGES, '');
-        const slug = slugify(baseName);
-        imageMap.set(slug, image);
-      }
-      
-      for (const recipe of syncedRecipes) {
-        const slug = slugify(recipe.name.replace(FILE_EXTENSIONS.MARKDOWN, ''));
-        // Create a File-like object from synced data
-        const file = new File([recipe.content], recipe.name, {
-          type: 'text/markdown',
-          lastModified: recipe.lastModified
-        });
-        slugToFile.set(slug, file);
-        
-        // Check if there's a matching image in synced images
-        if (imageMap.has(slug)) {
-          slugToImage.set(slug, imageMap.get(slug));
-        }
-        
-        processRecipeFile(slug, file, 'cloud');
-      }
-      return; // Exit early if we have synced recipes
-    }
-    
-    // Fallback: Handle local directory/file selection
-    if (!dirHandle) {
-      const recipeItem = document.createElement('div');
-      recipeItem.className = 'recipe-item';
-      recipeItem.innerHTML = '<em>No recipes loaded. Connect to Google Drive above or use the fallback folder picker.</em>';
-      UI.recipeListDiv.appendChild(recipeItem);
-      return;
-    }
-    
-    if (Array.isArray(dirHandle)) {
-      // Fallback mode: array of files
-      // First pass: collect all image files
-      const imageFiles = new Map();
-      for (const file of dirHandle) {
-        if (file.name.match(FILE_EXTENSIONS.IMAGES)) {
-          const baseName = file.name.replace(FILE_EXTENSIONS.IMAGES, '');
-          const slug = slugify(baseName);
-          imageFiles.set(slug, file);
-        }
-      }
-      
-      // Second pass: process recipe files and match with images
-      for (const file of dirHandle) {
-        if (file.name.endsWith(FILE_EXTENSIONS.MARKDOWN)) {
-          const baseName = file.name.replace(FILE_EXTENSIONS.MARKDOWN, '');
-          const slug = slugify(baseName);
-          
-          // Store file and process it
-          processRecipeFileWithImage(slug, file, imageFiles.get(slug), 'local');
-        }
-      }
-    } else {
-      // Modern mode: directory handle
-      // First pass: collect all image files
-      const imageEntries = new Map();
-      for await (const entry of dirHandle.values()) {
-        if (entry.kind === 'file' && entry.name.match(FILE_EXTENSIONS.IMAGES)) {
-          const baseName = entry.name.replace(FILE_EXTENSIONS.IMAGES, '');
-          const slug = slugify(baseName);
-          imageEntries.set(slug, entry);
-        }
-      }
-      
-      // Second pass: process recipe files and match with images
-      for await (const entry of dirHandle.values()) {
-        if (entry.kind === 'file' && entry.name.endsWith(FILE_EXTENSIONS.MARKDOWN)) {
-          const baseName = entry.name.replace(FILE_EXTENSIONS.MARKDOWN, '');
-          const slug = slugify(baseName);
-          
-          // Store file and process it
-          processRecipeFileWithImage(slug, entry, imageEntries.get(slug), 'local');
-        }
-      }
-    }
-  };
+    // GLOBAL STATE
+    let dirHandle = null;
+    const slugToFile = new Map();
+    const slugToImage = new Map();
+    const syncManager = new SyncManager();
+    let syncEnabled = false;
 
-  const renderRecipe = async (slug) => {
-    try {
-      const entry = slugToFile.get(slug);
-      if (!entry) {
-        UI.viewer.textContent = 'Recipe not found.';
+    // DOM REFERENCES
+    const UI = {
+      // Main UI elements
+      pickBtn: document.getElementById('pickDir'),
+      recipeListDiv: document.getElementById('recipe-list'),
+      viewer: document.getElementById('viewer'),
+
+      // Sync UI elements
+      syncStatus: document.getElementById('sync-status'),
+      syncStatusText: document.getElementById('sync-status-text'),
+      syncConnectBtn: document.getElementById('sync-connect-btn'),
+      syncNowBtn: document.getElementById('sync-now-btn'),
+      syncDisconnectBtn: document.getElementById('sync-disconnect-btn'),
+      syncProgress: document.getElementById('sync-progress'),
+      syncProgressText: document.getElementById('sync-progress-text'),
+
+      // Folder selection UI elements
+      folderSelection: document.getElementById('folder-selection'),
+      folderList: document.getElementById('folder-list'),
+      refreshFoldersBtn: document.getElementById('refresh-folders-btn'),
+      createFolderBtn: document.getElementById('create-folder-btn'),
+      selectFolderBtn: document.getElementById('select-folder-btn'),
+      shareForm: document.getElementById('share-form'),
+      shareEmailInput: document.getElementById('share-email'),
+      shareFolderBtn: document.getElementById('share-folder-btn'),
+      shareResult: document.getElementById('share-result'),
+
+      // Menu and navigation elements
+      appIconRecipes: document.getElementById('app-icon-recipes'),
+      recipesMenu: document.getElementById('recipes-menu'),
+      settingsMenuBtn: document.getElementById('settings-menu-btn'),
+      settingsMenu: document.getElementById('settings-menu'),
+      debugToggle: document.getElementById('debug-toggle'),
+      debugInfo: document.getElementById('debug-info'),
+
+      // PWA elements
+      installBanner: document.getElementById('install-banner'),
+      installBtn: document.getElementById('install-btn')
+    };
+
+    // UTILITY FUNCTIONS
+    const slugify = (s) =>
+      s.toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+    // RECIPE MANAGEMENT FUNCTIONS
+    const processRecipeFile = (slug, file, source) => {
+      processRecipeFileWithImage(slug, file, null, source);
+    };
+
+    const processRecipeFileWithImage = (slug, file, imageFile, source) => {
+      slugToFile.set(slug, file);
+      if (imageFile) {
+        slugToImage.set(slug, imageFile);
+      }
+
+      // Create recipe item element
+      const item = document.createElement('div');
+      item.className = 'recipe-item';
+
+      const icon = source === 'cloud' ? '☁️ ' : (source === 'local' ? '📁 ' : '');
+      const fileName = file.name || file;
+      const displayName = fileName.replace(FILE_EXTENSIONS.MARKDOWN, '');
+
+      item.textContent = `${icon}${displayName}`;
+      item.addEventListener('click', () => {
+        window.location.hash = `#recipe=${slug}`;
+        UI.recipesMenu.classList.remove('show');
+      });
+
+      UI.recipeListDiv.appendChild(item);
+    };
+
+    const renderIndex = async () => {
+      UI.recipeListDiv.innerHTML = '';
+      slugToFile.clear();
+      slugToImage.clear();
+
+      // First priority: Try to load from synced recipes (IndexedDB)
+      const syncedRecipes = await get(STORAGE_KEYS.RECIPE_DATA) || [];
+      const syncedImages = await get(STORAGE_KEYS.IMAGE_DATA) || [];
+
+      if (syncedRecipes.length > 0) {
+        console.log(`Loading ${syncedRecipes.length} synced recipes`);
+
+        // Create a map of images by base name for quick lookup
+        const imageMap = new Map();
+        for (const image of syncedImages) {
+          const baseName = image.name.replace(FILE_EXTENSIONS.IMAGES, '');
+          const slug = slugify(baseName);
+          imageMap.set(slug, image);
+        }
+
+        for (const recipe of syncedRecipes) {
+          const slug = slugify(recipe.name.replace(FILE_EXTENSIONS.MARKDOWN, ''));
+          // Create a File-like object from synced data
+          const file = new File([recipe.content], recipe.name, {
+            type: 'text/markdown',
+            lastModified: recipe.lastModified
+          });
+          slugToFile.set(slug, file);
+
+          // Check if there's a matching image in synced images
+          if (imageMap.has(slug)) {
+            slugToImage.set(slug, imageMap.get(slug));
+          }
+
+          processRecipeFile(slug, file, 'cloud');
+        }
+        return; // Exit early if we have synced recipes
+      }
+
+      // Fallback: Handle local directory/file selection
+      if (!dirHandle) {
+        const recipeItem = document.createElement('div');
+        recipeItem.className = 'recipe-item';
+        recipeItem.innerHTML = '<em>No recipes loaded. Connect to Google Drive above or use the fallback folder picker.</em>';
+        UI.recipeListDiv.appendChild(recipeItem);
         return;
       }
 
-      // Save current recipe to localStorage for persistence
-      try {
-        localStorage.setItem(STORAGE_KEYS.LAST_VIEWED_RECIPE, slug);
-      } catch (err) {
-        console.log('Could not save last viewed recipe:', err);
-      }
-
-      const file = entry.getFile ? await entry.getFile() : entry;  // Works for both FileSystemFileHandle and File
-      const text = await file.text();
-      const { data: fm, content } = matter(text);
-
-      let html = md.render(content);
-      html = DOMPurify.sanitize(html);
-
-    // Determine image source: frontmatter takes precedence, then check slugToImage map
-    let imageHtml = '';
-    if (fm.image) {
-      imageHtml = `<img src="${fm.image}" alt="" class="recipe-image">`;
-    } else if (slugToImage.has(slug)) {
-      // Get the image from the map
-      const imageEntry = slugToImage.get(slug);
-      if (imageEntry) {
-        try {
-          // Handle different types of image sources
-          if (imageEntry.dataUrl) {
-            // Synced image with data URL
-            imageHtml = `<img src="${imageEntry.dataUrl}" alt="" class="recipe-image">`;
-          } else if (imageEntry.getFile) {
-            // FileSystemFileHandle
-            const imageFile = await imageEntry.getFile();
-            const imageUrl = URL.createObjectURL(imageFile);
-            imageHtml = `<img src="${imageUrl}" alt="" class="recipe-image">`;
-          } else {
-            // File object
-            const imageUrl = URL.createObjectURL(imageEntry);
-            imageHtml = `<img src="${imageUrl}" alt="" class="recipe-image">`;
-          }
-        } catch (error) {
-          console.error('Error loading image:', error);
-        }
-      }
-    }
-
-      // Inject into DOM
-      UI.viewer.innerHTML = `
-      <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
-      ${imageHtml}
-      ${Array.isArray(fm.ingredients) ? `
-        <h2>What you'll need</h2>
-        <ul>${fm.ingredients.map(i => `<li>${DOMPurify.sanitize(i)}</li>`).join('')}</ul>` : ''}
-      <h2>What to do</h2>
-      ${html}
-    `;
-    } catch (error) {
-      console.error('Error rendering recipe:', error);
-      UI.viewer.innerHTML = '<p style="color: red;">Error loading recipe. Please try again.</p>';
-    }
-  };
-
-  async function verifyPermission(handle, mode = 'read') {
-    const opts = { mode };
-    // Was permission already granted?
-    if ((await handle.queryPermission(opts)) === 'granted') return true;
-    // If not, ask (only once per session)
-    return (await handle.requestPermission(opts)) === 'granted';
-  }
-
-  // ROUTING
-  const route = () => {
-    const match = location.hash.match(/recipe=([\w-]+)/);
-    if (match) {
-      renderRecipe(match[1]);
-    } else {
-      // No hash present, try to restore last viewed recipe
-      try {
-        const lastRecipe = localStorage.getItem(STORAGE_KEYS.LAST_VIEWED_RECIPE);
-        if (lastRecipe && slugToFile.has(lastRecipe)) {
-          // Set the URL hash to match the restored recipe
-          window.location.hash = `#recipe=${lastRecipe}`;
-          // renderRecipe will be called automatically by the hashchange event
-        }
-      } catch (err) {
-        console.log('Could not restore last viewed recipe:', err);
-      }
-    }
-  };
-  window.addEventListener('hashchange', route);
-
-  // SYNC FUNCTIONS
-  async function updateSyncStatus() {
-    const status = await syncManager.getStatus();
-    const isAuth = await syncManager.isAuthenticated();
-    
-    if (isAuth && status.connected) {
-      UI.syncStatus.className = 'sync-status connected';
-      UI.syncStatusText.textContent = `Connected to ${status.provider}`;
-      if (status.lastSync) {
-        UI.syncStatusText.textContent += ` - Last sync: ${new Date(status.lastSync).toLocaleString()}`;
-      }
-      UI.syncConnectBtn.disabled = true;
-      UI.syncNowBtn.disabled = status.syncInProgress;
-      UI.syncDisconnectBtn.disabled = false;
-    } else if (syncManager.provider) {
-      UI.syncStatus.className = 'sync-status disconnected';
-      UI.syncStatusText.textContent = 'Google Drive available - click to connect';
-      UI.syncConnectBtn.disabled = false;
-      UI.syncNowBtn.disabled = true;
-      UI.syncDisconnectBtn.disabled = true;
-    } else {
-      UI.syncStatus.className = 'sync-status disconnected';
-      UI.syncStatusText.textContent = 'Initializing cloud sync...';
-      UI.syncConnectBtn.disabled = true;
-      UI.syncNowBtn.disabled = true;
-      UI.syncDisconnectBtn.disabled = true;
-    }
-  }
-
-  async function initializeSync() {
-    try {
-      // Try to load config and initialize sync
-      const { CONFIG } = await import('/forked/config.js').catch(err => {
-        console.log('Config not available:', err.message);
-        throw new Error('Config not available');
-      });
-      const success = await syncManager.initProvider('google-drive', { clientId: CONFIG.google.clientId });
-      
-      if (success) {
-        syncEnabled = true;
-        console.log('Sync initialized successfully');
-        
-        // Check if we're already authenticated (from saved token)
-        console.log('📱 App: Checking if user is already authenticated...');
-        const isAuth = await syncManager.isAuthenticated();
-        console.log(`📱 App: Authentication status after init: ${isAuth ? '✅ AUTHENTICATED' : '❌ NOT AUTHENTICATED'}`);
-        
-        if (isAuth) {
-          // We have a valid saved token - update UI to show connected state
-          console.log('📱 App: ✅ Found valid saved authentication - setting up automatic sync');
-          
-          try {
-            // Try to restore previously selected folder
-            const restoredFolder = await syncManager.provider.restoreFolderSelection();
-            if (restoredFolder) {
-              console.log('Restored folder selection:', restoredFolder);
-              
-              // Update UI to show connected state
-              await updateSyncStatus();
-              
-              // Automatically sync if we have both auth and folder
-              UI.syncStatusText.textContent = 'Connected - Starting automatic sync...';
-              
-              try {
-                // Perform sync
-                await performSync();
-                console.log('Automatic sync completed successfully');
-              } catch (syncError) {
-                console.error('Automatic sync failed:', syncError);
-                UI.syncStatusText.textContent = `Connected - Sync failed: ${syncError.message}`;
-              }
-            } else {
-              // Authenticated but no folder selected
-              console.log('Authenticated but no folder selected');
-              await updateSyncStatus();
-              UI.syncStatusText.textContent = 'Connected - Please select a recipe folder';
-              // Show folder selection UI
-              await showFolderSelection();
-            }
-          } catch (error) {
-            console.error('Error during authentication setup:', error);
-            await updateSyncStatus();
+      if (Array.isArray(dirHandle)) {
+        // Fallback mode: array of files
+        // First pass: collect all image files
+        const imageFiles = new Map();
+        for (const file of dirHandle) {
+          if (file.name.match(FILE_EXTENSIONS.IMAGES)) {
+            const baseName = file.name.replace(FILE_EXTENSIONS.IMAGES, '');
+            const slug = slugify(baseName);
+            imageFiles.set(slug, file);
           }
         }
-        } else {
-          // Not authenticated - show default disconnected state
-          console.log('📱 App: ❌ No valid saved authentication found - user needs to connect');
-          await updateSyncStatus();
-        }
-      } else {
-        console.log('Sync initialization failed');
-      }
-    } catch (error) {
-      console.log('Sync not available:', error.message);
-      // Hide settings dropdown if config is missing
-      const settingsDropdown = document.querySelector('.menu-dropdown:nth-child(2)');
-      if (settingsDropdown) {
-        settingsDropdown.style.display = 'none';
-      }
-      return;
-    }
-  }
 
-  async function connectToSync() {
-    try {
-      UI.syncConnectBtn.disabled = true;
-      UI.syncStatusText.textContent = 'Connecting to Google Drive...';
-      
-      const result = await syncManager.authenticate();
-      if (result.success) {
-        await updateSyncStatus();
-        
-        // Check if we have a folder selected
-        if (!syncManager.provider.recipeFolderId) {
-          UI.syncStatusText.textContent = 'Connected - Please select a recipe folder';
-          await showFolderSelection();
-        } else {
-          // Try to sync immediately after connecting
-          await performSync();
-        }
-      } else {
-        UI.syncStatusText.textContent = `Connection failed: ${result.error}`;
-        UI.syncConnectBtn.disabled = false;
-      }
-    } catch (error) {
-      console.error('Connection error:', error);
-      UI.syncStatusText.textContent = `Connection error: ${error.message}`;
-      UI.syncConnectBtn.disabled = false;
-    }
-  }
-
-  async function performSync() {
-    try {
-      if (!await syncManager.isAuthenticated()) {
-        await connectToSync();
-        return;
-      }
-      
-      // Check if we have a folder selected
-      if (!syncManager.provider.recipeFolderId) {
-        UI.syncStatusText.textContent = 'Please select a recipe folder first';
-        await showFolderSelection();
-        return;
-      }
-      
-      console.log('Starting manual sync...');
-      UI.syncProgress.classList.remove('hidden');
-      UI.syncNowBtn.disabled = true;
-      
-      // Debug: Check what we can see in the cloud before syncing
-      try {
-        const cloudRecipes = await syncManager.provider.listRecipes();
-        console.log('Cloud recipes before sync:', cloudRecipes);
-        const localRecipes = await get(STORAGE_KEYS.RECIPE_DATA) || [];
-        console.log('Local recipes before sync:', localRecipes);
-      } catch (error) {
-        console.error('Error listing recipes:', error);
-      }
-      
-      const result = await syncManager.sync((progress) => {
-        console.log('Sync progress:', progress);
-        UI.syncProgressText.textContent = `${progress.status}: ${progress.progress}%`;
-        if (progress.current) {
-          UI.syncProgressText.textContent += ` - ${progress.current}`;
-        }
-      });
-      
-      console.log('Sync result:', result);
-      
-      if (result.success) {
-        UI.syncProgressText.textContent = `Sync complete! Uploaded: ${result.uploaded}, Downloaded: ${result.downloaded}`;
-        // Refresh the recipe list
-        await renderIndex();
-      } else {
-        UI.syncProgressText.textContent = `Sync failed: ${result.error}`;
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-      UI.syncProgressText.textContent = `Sync error: ${error.message}`;
-    } finally {
-      UI.syncNowBtn.disabled = false;
-      await updateSyncStatus();
-      setTimeout(() => UI.syncProgress.classList.add('hidden'), SYNC_PROGRESS_HIDE_DELAY);
-    }
-  }
-
-  async function disconnectFromSync() {
-    await syncManager.signOut();
-    await updateSyncStatus();
-  }
-
-  async function pickRecipeFolder() {
-    if ('showDirectoryPicker' in window) {
-      // Modern Chromium path (read + write)
-      return await window.showDirectoryPicker();
-    }
-
-    // Fallback: let user pick a whole folder read-only (WebKit proprietary)
-    return new Promise((resolve) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.webkitdirectory = true;
-      input.multiple = true;
-      input.addEventListener('change', () => {
-        resolve(Array.from(input.files));
-      });
-      input.click();
-    });
-  }
-
-  // FOLDER MANAGEMENT
-  UI.pickBtn.addEventListener('click', async () => {
-    dirHandle = await pickRecipeFolder();
-    if (dirHandle) {
-      // Save both directory handles and file arrays
-      if (dirHandle.kind === 'directory') {
-        // Modern browsers: save directory handle
-        await set(STORAGE_KEYS.RECIPE_DIR_HANDLE, dirHandle);
-      } else if (Array.isArray(dirHandle)) {
-        // Fallback browsers: Store recipe content in IndexedDB for persistence
-        console.log('Storing recipe files in IndexedDB for persistence...');
-        const recipes = [];
+        // Second pass: process recipe files and match with images
         for (const file of dirHandle) {
           if (file.name.endsWith(FILE_EXTENSIONS.MARKDOWN)) {
-            const content = await file.text();
-            recipes.push({
-              name: file.name,
-              content: content,
-              lastModified: file.lastModified,
-              size: file.size
-            });
+            const baseName = file.name.replace(FILE_EXTENSIONS.MARKDOWN, '');
+            const slug = slugify(baseName);
+
+            // Store file and process it
+            processRecipeFileWithImage(slug, file, imageFiles.get(slug), 'local');
           }
         }
-        await set(STORAGE_KEYS.RECIPE_DATA, recipes);
-        console.log(`Stored ${recipes.length} recipes in IndexedDB`);
-      }
-      await renderIndex();
-      route();
-    }
-  });
-  
-  // FOLDER SELECTION
-  let selectedFolderId = null;
-  async function showFolderSelection() {
-    UI.folderSelection.classList.remove('hidden');
-    await loadAvailableFolders();
-  }
-
-  async function hideFolderSelection() {
-    UI.folderSelection.classList.add('hidden');
-    UI.shareForm.classList.add('hidden');
-  }
-
-  async function loadAvailableFolders() {
-    UI.folderList.innerHTML = '<div>Loading folders...</div>';
-    
-    try {
-      if (!syncManager.provider) {
-        throw new Error('Sync provider not initialized');
-      }
-      const folders = await syncManager.provider.listAvailableFolders();
-      UI.folderList.innerHTML = '';
-      
-      if (folders.length === 0) {
-        UI.folderList.innerHTML = '<div><em>No folders found. Create a new one below.</em></div>';
-        return;
-      }
-      
-      console.log('Folder selection debug:', {
-        totalFolders: folders.length,
-        folders: folders.map(f => ({
-          name: f.name,
-          id: f.id,
-          isPrevious: f.isPrevious,
-          isRecipeBox: f.isRecipeBox
-        }))
-      });
-      
-      // Determine which folder to auto-select
-      let folderToAutoSelect = null;
-      
-      // Priority 1: Previously selected folder
-      const previousFolder = folders.find(f => f.isPrevious);
-      if (previousFolder) {
-        folderToAutoSelect = previousFolder;
-      }
-      // Priority 2: RecipeBox folder (if no previous selection)
-      else {
-        const recipeBoxFolder = folders.find(f => f.isRecipeBox);
-        if (recipeBoxFolder) {
-          folderToAutoSelect = recipeBoxFolder;
-        }
-      }
-      
-      // Sort folders: Previous first, then RecipeBox, then alphabetically
-      const sortedFolders = [...folders].sort((a, b) => {
-        if (a.isPrevious) return -1;
-        if (b.isPrevious) return 1;
-        if (a.isRecipeBox) return -1;
-        if (b.isRecipeBox) return 1;
-        return a.name.localeCompare(b.name);
-      });
-      
-      for (const folder of sortedFolders) {
-        const folderDiv = document.createElement('div');
-        folderDiv.className = 'folder-item';
-        folderDiv.dataset.folderId = folder.id;
-        
-        // Auto-select the determined folder
-        const shouldAutoSelect = folderToAutoSelect && folder.id === folderToAutoSelect.id;
-        if (shouldAutoSelect) {
-          folderDiv.classList.add('selected');
-          selectedFolderId = folder.id;
-          UI.selectFolderBtn.disabled = false;
-          UI.shareForm.classList.remove('hidden');
-        }
-        
-        // Determine the label and badges
-        let label = folder.name;
-        let badges = [];
-        
-        // Ownership/sharing badges
-        if (folder.isOwned) {
-          badges.push('<span class="folder-badge owned">Owned</span>');
-        }
-        if (folder.isShared) {
-          badges.push('<span class="folder-badge shared">Shared</span>');
-        }
-        
-        // Special status badges
-        if (folder.isPrevious && folder.isRecipeBox) {
-          label += ' (Current)';
-          badges.push('<span class="folder-badge" style="background: #17a2b8;">Current</span>');
-        } else if (folder.isPrevious) {
-          label += ' (Previously Selected)';
-          badges.push('<span class="folder-badge" style="background: #17a2b8;">Previous</span>');
-        } else if (folder.isRecipeBox) {
-          label += ' (Recommended)';
-          badges.push('<span class="folder-badge" style="background: #28a745;">Recommended</span>');
-        }
-        
-        folderDiv.innerHTML = `
-          <div class="folder-info">
-            <strong>${label}</strong>
-            <div class="folder-badges">
-              ${badges.filter(badge => badge).join('')}
-            </div>
-          </div>
-        `;
-        
-        folderDiv.addEventListener('click', () => selectFolder(folder.id, folderDiv));
-        UI.folderList.appendChild(folderDiv);
-      }
-      
-      // If we auto-selected a folder, log it
-      if (folderToAutoSelect) {
-        console.log('Auto-selected folder:', folderToAutoSelect.name, folderToAutoSelect.id);
-      }
-    } catch (error) {
-      UI.folderList.innerHTML = `<div style="color: red;">Error loading folders: ${error.message}</div>`;
-    }
-  }
-
-  function selectFolder(folderId, folderElement) {
-    // Clear previous selection
-    document.querySelectorAll('.folder-item').forEach(item => {
-      item.classList.remove('selected');
-    });
-    
-    // Select new folder
-    folderElement.classList.add('selected');
-    selectedFolderId = folderId;
-    
-    // Enable the select button
-    UI.selectFolderBtn.disabled = false;
-    
-    // Show share form
-    UI.shareForm.classList.remove('hidden');
-  }
-
-  async function createNewFolder() {
-    const folderName = prompt('Enter folder name:', DEFAULT_RECIPE_FOLDER_NAME);
-    if (!folderName) return;
-    
-    try {
-      UI.createFolderBtn.disabled = true;
-      UI.createFolderBtn.textContent = 'Creating...';
-      
-      const folderId = await syncManager.provider.createRecipeFolder(folderName);
-      
-      // Refresh folder list and select the new folder
-      await loadAvailableFolders();
-      
-      // Find and select the newly created folder
-      const folderElements = document.querySelectorAll('.folder-item');
-      for (const element of folderElements) {
-        if (element.dataset.folderId === folderId) {
-          selectFolder(folderId, element);
-          break;
-        }
-      }
-      
-      alert(`Folder "${folderName}" created successfully!`);
-    } catch (error) {
-      alert(`Failed to create folder: ${error.message}`);
-    } finally {
-      UI.createFolderBtn.disabled = false;
-      UI.createFolderBtn.textContent = 'Create New Folder';
-    }
-  }
-
-  async function shareSelectedFolder() {
-    if (!selectedFolderId) {
-      alert('Please select a folder first');
-      return;
-    }
-    
-    const email = UI.shareEmailInput.value.trim();
-    if (!email) {
-      alert('Please enter an email address');
-      return;
-    }
-    
-    try {
-      UI.shareFolderBtn.disabled = true;
-      UI.shareFolderBtn.textContent = 'Sharing...';
-      UI.shareResult.innerHTML = '';
-      
-      const result = await syncManager.provider.shareFolder(selectedFolderId, email);
-      
-      if (result.success) {
-        UI.shareResult.innerHTML = '<div style="color: green;">✓ Folder shared successfully!</div>';
-        UI.shareEmailInput.value = '';
       } else {
-        UI.shareResult.innerHTML = `<div style="color: red;">✗ Failed to share: ${result.error}</div>`;
-      }
-    } catch (error) {
-      UI.shareResult.innerHTML = `<div style="color: red;">✗ Error: ${error.message}</div>`;
-    } finally {
-      UI.shareFolderBtn.disabled = false;
-      UI.shareFolderBtn.textContent = 'Share Folder';
-    }
-  }
-
-  async function finalizeFolderSelection() {
-    if (!selectedFolderId) {
-      alert('Please select a folder first');
-      return;
-    }
-    
-    try {
-      await syncManager.provider.selectFolder(selectedFolderId);
-      await hideFolderSelection();
-      await updateSyncStatus();
-      
-      // Try to sync after folder selection
-      await performSync();
-    } catch (error) {
-      alert(`Error selecting folder: ${error.message}`);
-    }
-  }
-
-  // EVENT HANDLERS
-
-  // Folder selection event handlers
-  UI.refreshFoldersBtn.addEventListener('click', loadAvailableFolders);
-  UI.createFolderBtn.addEventListener('click', createNewFolder);
-  UI.selectFolderBtn.addEventListener('click', finalizeFolderSelection);
-  UI.shareFolderBtn.addEventListener('click', shareSelectedFolder);
-
-  // Sync event handlers
-  UI.syncConnectBtn.addEventListener('click', connectToSync);
-  UI.syncNowBtn.addEventListener('click', performSync);
-  UI.syncDisconnectBtn.addEventListener('click', disconnectFromSync);
-  
-  // Menu dropdown handlers
-  UI.appIconRecipes.addEventListener('click', (e) => {
-    e.stopPropagation();
-    UI.settingsMenu.classList.remove('show');
-    UI.recipesMenu.classList.toggle('show');
-  });
-  
-  UI.settingsMenuBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    UI.recipesMenu.classList.remove('show');
-    UI.settingsMenu.classList.toggle('show');
-  });
-  
-  // Debug toggle with utility functions
-  let debugUtils = null;
-  
-  UI.debugToggle.addEventListener('click', () => {
-    UI.debugInfo.style.display = UI.debugInfo.style.display === 'none' ? 'block' : 'none';
-    
-    // Initialize debug utilities when debug panel is opened
-    if (UI.debugInfo.style.display === 'block' && !debugUtils) {
-      debugUtils = {
-        clearCacheAndReload: async () => {
-          try {
-            // Clear service worker caches
-            const cacheNames = await caches.keys();
-            await Promise.all(cacheNames.map(name => caches.delete(name)));
-            
-            // Clear IndexedDB data
-            await clear();
-            
-            // Unregister service worker
-            if ('serviceWorker' in navigator) {
-              const registrations = await navigator.serviceWorker.getRegistrations();
-              await Promise.all(registrations.map(reg => reg.unregister()));
-            }
-            
-            // Force reload
-            window.location.reload(true);
-          } catch (err) {
-            console.error('Error clearing cache:', err);
-            window.location.reload(true);
+        // Modern mode: directory handle
+        // First pass: collect all image files
+        const imageEntries = new Map();
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file' && entry.name.match(FILE_EXTENSIONS.IMAGES)) {
+            const baseName = entry.name.replace(FILE_EXTENSIONS.IMAGES, '');
+            const slug = slugify(baseName);
+            imageEntries.set(slug, entry);
           }
         }
-      };
-      
-      // Make debug utilities available globally only when debug is active
-      window.debugUtils = debugUtils;
-    }
-  });
-  
-  // Close dropdowns when clicking outside
-  document.addEventListener('click', () => {
-    UI.recipesMenu.classList.remove('show');
-    UI.settingsMenu.classList.remove('show');
-  });
-  
-  // Prevent dropdown closing when clicking inside
-  UI.recipesMenu.addEventListener('click', (e) => e.stopPropagation());
-  UI.settingsMenu.addEventListener('click', (e) => e.stopPropagation());
-  
-  // INITIALIZATION
-  (async () => {
-    try {
-      // Try to restore directory handle first (modern browsers)
-      const saved = await get(STORAGE_KEYS.RECIPE_DIR_HANDLE);
-      if (saved && await verifyPermission(saved, 'read')) {
-        dirHandle = saved;
-        await renderIndex();
-        route();
-        return;
-      }
-    } catch (err) {
-      console.log('Error restoring directory handle:', err);
-    }
-    
-    try {
-      // Fallback: try to restore recipe data (Android/fallback browsers)
-      const recipeData = await get(STORAGE_KEYS.RECIPE_DATA);
-      if (recipeData && recipeData.length > 0) {
-        console.log(`Restored ${recipeData.length} recipes from IndexedDB`);
-        // Create mock File objects from stored data
-        dirHandle = recipeData.map(recipe => new File([recipe.content], recipe.name, {
-          type: 'text/markdown',
-          lastModified: recipe.lastModified
-        }));
-        await renderIndex();
-        route();
-      }
-    } catch (err) {
-      console.log('Error restoring recipe data:', err);
-    }
-  })();
 
-  // Initialize sync functionality
-  (async () => {
-    try {
-      console.log('Starting sync initialization...');
-      await initializeSync();
-      console.log('Sync initialization complete');
-      // After sync is initialized, try to load synced recipes
-      await renderIndex();
-      route();
-      console.log('DebugSync should now be available');
-    } catch (error) {
-      console.error('Error during sync initialization:', error);
-    }
-  })();
+        // Second pass: process recipe files and match with images
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file' && entry.name.endsWith(FILE_EXTENSIONS.MARKDOWN)) {
+            const baseName = entry.name.replace(FILE_EXTENSIONS.MARKDOWN, '');
+            const slug = slugify(baseName);
 
-  // PWA AND SERVICE WORKER
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
-      try {
-        const registration = await navigator.serviceWorker.register('/forked/sw.js');
-        console.log('ServiceWorker registration successful:', registration.scope);
-        
-        // Handle updates
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          newWorker.addEventListener('statechange', () => {
-            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-              // New service worker available
-              console.log('New content available; refresh to update.');
-            }
-          });
-        });
-      } catch (err) {
-        console.log('ServiceWorker registration failed:', err);
-      }
-    });
-  }
-
-  // PWA Install prompt
-  let deferredPrompt;
-  
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    // Only show banner if not already running as installed PWA
-    if (!isRunningStandalone()) {
-      UI.installBanner.classList.remove('hidden');
-    }
-  });
-  
-  // Check if app is running in standalone mode (installed PWA)
-  function isRunningStandalone() {
-    const standalone = window.matchMedia('(display-mode: standalone)').matches ||
-                      window.navigator.standalone === true ||
-                      document.referrer.includes('android-app://') ||
-                      window.matchMedia('(display-mode: fullscreen)').matches ||
-                      window.matchMedia('(display-mode: minimal-ui)').matches;
-    
-    console.log('PWA Standalone Detection:', {
-      'display-mode: standalone': window.matchMedia('(display-mode: standalone)').matches,
-      'navigator.standalone': window.navigator.standalone,
-      'referrer': document.referrer,
-      'display-mode: fullscreen': window.matchMedia('(display-mode: fullscreen)').matches,
-      'display-mode: minimal-ui': window.matchMedia('(display-mode: minimal-ui)').matches,
-      'final result': standalone
-    });
-    
-    return standalone;
-  }
-  
-  // Hide banner if already running as PWA
-  async function checkAndHideBanner() {
-    // Check if previously installed
-    const wasInstalled = await get(STORAGE_KEYS.APP_INSTALLED);
-    const isStandalone = isRunningStandalone();
-    
-    // Prepare debug info for when debug toggle is clicked
-    if (UI.debugInfo) {
-      UI.debugInfo.innerHTML = `
-        <strong>PWA Debug Info:</strong><br>
-        Version: <span id="debug-version">Loading...</span><br>
-        Current URL: ${window.location.href}<br>
-        Standalone: ${isStandalone}<br>
-        Was Installed: ${wasInstalled}<br>
-        Display Mode: ${window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser'}<br>
-        Navigator Standalone: ${window.navigator.standalone}<br>
-        Referrer: ${document.referrer}<br>
-        User Agent: ${navigator.userAgent.substring(0, 50)}...<br>
-        <button onclick="window.debugUtils?.clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
-      `;
-      
-      // Get version from service worker cache asynchronously
-      (async () => {
-        try {
-          let version = 'Unknown';
-          if ('caches' in window) {
-            const cacheNames = await caches.keys();
-            const recipeCache = cacheNames.find(name => name.startsWith('recipe-app-v'));
-            if (recipeCache) {
-              version = recipeCache.replace('recipe-app-v', '');
-            }
+            // Store file and process it
+            processRecipeFileWithImage(slug, entry, imageEntries.get(slug), 'local');
           }
-          // Update the version in the debug panel
-          const versionSpan = document.getElementById('debug-version');
-          if (versionSpan) {
-            versionSpan.textContent = version;
+        }
+      }
+    };
+
+    const renderRecipe = async (slug) => {
+      try {
+        const entry = slugToFile.get(slug);
+        if (!entry) {
+          UI.viewer.textContent = 'Recipe not found.';
+          return;
+        }
+
+        // Save current recipe to localStorage for persistence
+        try {
+          localStorage.setItem(STORAGE_KEYS.LAST_VIEWED_RECIPE, slug);
+        } catch (err) {
+          console.log('Could not save last viewed recipe:', err);
+        }
+
+        const file = entry.getFile ? await entry.getFile() : entry;  // Works for both FileSystemFileHandle and File
+        const text = await file.text();
+        const { data: fm, content } = matter(text);
+
+        let html = md.render(content);
+        html = DOMPurify.sanitize(html);
+
+      // Determine image source: frontmatter takes precedence, then check slugToImage map
+      let imageHtml = '';
+      if (fm.image) {
+        imageHtml = `<img src="${fm.image}" alt="" class="recipe-image">`;
+      } else if (slugToImage.has(slug)) {
+        // Get the image from the map
+        const imageEntry = slugToImage.get(slug);
+        if (imageEntry) {
+          try {
+            // Handle different types of image sources
+            if (imageEntry.dataUrl) {
+              // Synced image with data URL
+              imageHtml = `<img src="${imageEntry.dataUrl}" alt="" class="recipe-image">`;
+            } else if (imageEntry.getFile) {
+              // FileSystemFileHandle
+              const imageFile = await imageEntry.getFile();
+              const imageUrl = URL.createObjectURL(imageFile);
+              imageHtml = `<img src="${imageUrl}" alt="" class="recipe-image">`;
+            } else {
+              // File object
+              const imageUrl = URL.createObjectURL(imageEntry);
+              imageHtml = `<img src="${imageUrl}" alt="" class="recipe-image">`;
+            }
+          } catch (error) {
+            console.error('Error loading image:', error);
+          }
+        }
+      }
+
+        // Inject into DOM
+        UI.viewer.innerHTML = `
+        <h1>${fm.title ?? file.name.replace(/\\.md$/, '')}</h1>
+        ${imageHtml}
+        ${Array.isArray(fm.ingredients) ? `
+          <h2>What you'll need</h2>
+          <ul>${fm.ingredients.map(i => `<li>${DOMPurify.sanitize(i)}</li>`).join('')}</ul>` : ''}
+        <h2>What to do</h2>
+        ${html}
+      `;
+      } catch (error) {
+        console.error('Error rendering recipe:', error);
+        UI.viewer.innerHTML = '<p style="color: red;">Error loading recipe. Please try again.</p>';
+      }
+    };
+
+    async function verifyPermission(handle, mode = 'read') {
+      const opts = { mode };
+      // Was permission already granted?
+      if ((await handle.queryPermission(opts)) === 'granted') return true;
+      // If not, ask (only once per session)
+      return (await handle.requestPermission(opts)) === 'granted';
+    }
+
+    // ROUTING
+    const route = () => {
+      const match = location.hash.match(/recipe=([\w-]+)/);
+      if (match) {
+        renderRecipe(match[1]);
+      } else {
+        // No hash present, try to restore last viewed recipe
+        try {
+          const lastRecipe = localStorage.getItem(STORAGE_KEYS.LAST_VIEWED_RECIPE);
+          if (lastRecipe && slugToFile.has(lastRecipe)) {
+            // Set the URL hash to match the restored recipe
+            window.location.hash = `#recipe=${lastRecipe}`;
+            // renderRecipe will be called automatically by the hashchange event
           }
         } catch (err) {
-          console.log('Could not get version from cache:', err);
-          const versionSpan = document.getElementById('debug-version');
-          if (versionSpan) {
-            versionSpan.textContent = 'Error';
+          console.log('Could not restore last viewed recipe:', err);
+        }
+      }
+    };
+    window.addEventListener('hashchange', route);
+
+    // SYNC FUNCTIONS
+    async function updateSyncStatus() {
+      const status = await syncManager.getStatus();
+      const isAuth = await syncManager.isAuthenticated();
+
+      if (isAuth && status.connected) {
+        UI.syncStatus.className = 'sync-status connected';
+        UI.syncStatusText.textContent = `Connected to ${status.provider}`;
+        if (status.lastSync) {
+          UI.syncStatusText.textContent += ` - Last sync: ${new Date(status.lastSync).toLocaleString()}`;
+        }
+        UI.syncConnectBtn.disabled = true;
+        UI.syncNowBtn.disabled = status.syncInProgress;
+        UI.syncDisconnectBtn.disabled = false;
+      } else if (syncManager.provider) {
+        UI.syncStatus.className = 'sync-status disconnected';
+        UI.syncStatusText.textContent = 'Google Drive available - click to connect';
+        UI.syncConnectBtn.disabled = false;
+        UI.syncNowBtn.disabled = true;
+        UI.syncDisconnectBtn.disabled = true;
+      } else {
+        UI.syncStatus.className = 'sync-status disconnected';
+        UI.syncStatusText.textContent = 'Initializing cloud sync...';
+        UI.syncConnectBtn.disabled = true;
+        UI.syncNowBtn.disabled = true;
+        UI.syncDisconnectBtn.disabled = true;
+      }
+    }
+
+    async function initializeSync() {
+      try {
+        // Try to load config and initialize sync
+        const { CONFIG } = await import('/forked/config.js').catch(err => {
+          console.log('Config not available:', err.message);
+          throw new Error('Config not available');
+        });
+        const success = await syncManager.initProvider('google-drive', { clientId: CONFIG.google.clientId });
+
+        if (success) {
+          syncEnabled = true;
+          console.log('Sync initialized successfully');
+
+          // Check if we're already authenticated (from saved token)
+          console.log('📱 App: Checking if user is already authenticated...');
+          const isAuth = await syncManager.isAuthenticated();
+          console.log(`📱 App: Authentication status after init: ${isAuth ? '✅ AUTHENTICATED' : '❌ NOT AUTHENTICATED'}`);
+
+          if (isAuth) {
+            // We have a valid saved token - update UI to show connected state
+            console.log('📱 App: ✅ Found valid saved authentication - setting up automatic sync');
+
+            try {
+              // Try to restore previously selected folder
+              const restoredFolder = await syncManager.provider.restoreFolderSelection();
+              if (restoredFolder) {
+                console.log('Restored folder selection:', restoredFolder);
+
+                // Update UI to show connected state
+                await updateSyncStatus();
+
+                // Automatically sync if we have both auth and folder
+                UI.syncStatusText.textContent = 'Connected - Starting automatic sync...';
+
+                try {
+                  // Perform sync
+                  await performSync();
+                  console.log('Automatic sync completed successfully');
+                } catch (syncError) {
+                  console.error('Automatic sync failed:', syncError);
+                  UI.syncStatusText.textContent = `Connected - Sync failed: ${syncError.message}`;
+                }
+              } else {
+                // Authenticated but no folder selected
+                console.log('Authenticated but no folder selected');
+                await updateSyncStatus();
+                UI.syncStatusText.textContent = 'Connected - Please select a recipe folder';
+                // Show folder selection UI
+                await showFolderSelection();
+              }
+            } catch (error) {
+              console.error('Error during authentication setup:', error);
+              await updateSyncStatus();
+            }
+          } else {
+            // Not authenticated - show default disconnected state
+            console.log('📱 App: ❌ No valid saved authentication found - user needs to connect');
+            await updateSyncStatus();
+          }
+        } else {
+          console.log('Sync initialization failed');
+        }
+      } catch (error) {
+        console.log('Sync not available:', error.message);
+        // Hide settings dropdown if config is missing
+        const settingsDropdown = document.querySelector('.menu-dropdown:nth-child(2)');
+        if (settingsDropdown) {
+          settingsDropdown.style.display = 'none';
+        }
+        return;
+      }
+    }
+
+    async function connectToSync() {
+      try {
+        UI.syncConnectBtn.disabled = true;
+        UI.syncStatusText.textContent = 'Connecting to Google Drive...';
+
+        const result = await syncManager.authenticate();
+        if (result.success) {
+          await updateSyncStatus();
+
+          // Check if we have a folder selected
+          if (!syncManager.provider.recipeFolderId) {
+            UI.syncStatusText.textContent = 'Connected - Please select a recipe folder';
+            await showFolderSelection();
+          } else {
+            // Try to sync immediately after connecting
+            await performSync();
+          }
+        } else {
+          UI.syncStatusText.textContent = `Connection failed: ${result.error}`;
+          UI.syncConnectBtn.disabled = false;
+        }
+      } catch (error) {
+        console.error('Connection error:', error);
+        UI.syncStatusText.textContent = `Connection error: ${error.message}`;
+        UI.syncConnectBtn.disabled = false;
+      }
+    }
+
+    async function performSync() {
+      try {
+        if (!await syncManager.isAuthenticated()) {
+          await connectToSync();
+          return;
+        }
+
+        // Check if we have a folder selected
+        if (!syncManager.provider.recipeFolderId) {
+          UI.syncStatusText.textContent = 'Please select a recipe folder first';
+          await showFolderSelection();
+          return;
+        }
+
+        console.log('Starting manual sync...');
+        UI.syncProgress.classList.remove('hidden');
+        UI.syncNowBtn.disabled = true;
+
+        // Debug: Check what we can see in the cloud before syncing
+        try {
+          const cloudRecipes = await syncManager.provider.listRecipes();
+          console.log('Cloud recipes before sync:', cloudRecipes);
+          const localRecipes = await get(STORAGE_KEYS.RECIPE_DATA) || [];
+          console.log('Local recipes before sync:', localRecipes);
+        } catch (error) {
+          console.error('Error listing recipes:', error);
+        }
+
+        const result = await syncManager.sync((progress) => {
+          console.log('Sync progress:', progress);
+          UI.syncProgressText.textContent = `${progress.status}: ${progress.progress}%`;
+          if (progress.current) {
+            UI.syncProgressText.textContent += ` - ${progress.current}`;
+          }
+        });
+
+        console.log('Sync result:', result);
+
+        if (result.success) {
+          UI.syncProgressText.textContent = `Sync complete! Uploaded: ${result.uploaded}, Downloaded: ${result.downloaded}`;
+          // Refresh the recipe list
+          await renderIndex();
+        } else {
+          UI.syncProgressText.textContent = `Sync failed: ${result.error}`;
+        }
+      } catch (error) {
+        console.error('Sync error:', error);
+        UI.syncProgressText.textContent = `Sync error: ${error.message}`;
+      } finally {
+        UI.syncNowBtn.disabled = false;
+        await updateSyncStatus();
+        setTimeout(() => UI.syncProgress.classList.add('hidden'), SYNC_PROGRESS_HIDE_DELAY);
+      }
+    }
+
+    async function disconnectFromSync() {
+      await syncManager.signOut();
+      await updateSyncStatus();
+    }
+
+    async function pickRecipeFolder() {
+      if ('showDirectoryPicker' in window) {
+        // Modern Chromium path (read + write)
+        return await window.showDirectoryPicker();
+      }
+
+      // Fallback: let user pick a whole folder read-only (WebKit proprietary)
+      return new Promise((resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.webkitdirectory = true;
+        input.multiple = true;
+        input.addEventListener('change', () => {
+          resolve(Array.from(input.files));
+        });
+        input.click();
+      });
+    }
+
+    // FOLDER MANAGEMENT
+    UI.pickBtn.addEventListener('click', async () => {
+      dirHandle = await pickRecipeFolder();
+      if (dirHandle) {
+        // Save both directory handles and file arrays
+        if (dirHandle.kind === 'directory') {
+          // Modern browsers: save directory handle
+          await set(STORAGE_KEYS.RECIPE_DIR_HANDLE, dirHandle);
+        } else if (Array.isArray(dirHandle)) {
+          // Fallback browsers: Store recipe content in IndexedDB for persistence
+          console.log('Storing recipe files in IndexedDB for persistence...');
+          const recipes = [];
+          for (const file of dirHandle) {
+            if (file.name.endsWith(FILE_EXTENSIONS.MARKDOWN)) {
+              const content = await file.text();
+              recipes.push({
+                name: file.name,
+                content: content,
+                lastModified: file.lastModified,
+                size: file.size
+              });
+            }
+          }
+          await set(STORAGE_KEYS.RECIPE_DATA, recipes);
+          console.log(`Stored ${recipes.length} recipes in IndexedDB`);
+        }
+        await renderIndex();
+        route();
+      }
+    });
+
+    // FOLDER SELECTION
+    let selectedFolderId = null;
+    async function showFolderSelection() {
+      UI.folderSelection.classList.remove('hidden');
+      await loadAvailableFolders();
+    }
+
+    async function hideFolderSelection() {
+      UI.folderSelection.classList.add('hidden');
+      UI.shareForm.classList.add('hidden');
+    }
+
+    async function loadAvailableFolders() {
+      UI.folderList.innerHTML = '<div>Loading folders...</div>';
+
+      try {
+        if (!syncManager.provider) {
+          throw new Error('Sync provider not initialized');
+        }
+        const folders = await syncManager.provider.listAvailableFolders();
+        UI.folderList.innerHTML = '';
+
+        if (folders.length === 0) {
+          UI.folderList.innerHTML = '<div><em>No folders found. Create a new one below.</em></div>';
+          return;
+        }
+
+        console.log('Folder selection debug:', {
+          totalFolders: folders.length,
+          folders: folders.map(f => ({
+            name: f.name,
+            id: f.id,
+            isPrevious: f.isPrevious,
+            isRecipeBox: f.isRecipeBox
+          }))
+        });
+
+        // Determine which folder to auto-select
+        let folderToAutoSelect = null;
+
+        // Priority 1: Previously selected folder
+        const previousFolder = folders.find(f => f.isPrevious);
+        if (previousFolder) {
+          folderToAutoSelect = previousFolder;
+        }
+        // Priority 2: RecipeBox folder (if no previous selection)
+        else {
+          const recipeBoxFolder = folders.find(f => f.isRecipeBox);
+          if (recipeBoxFolder) {
+            folderToAutoSelect = recipeBoxFolder;
           }
         }
-      })();
-      
-      // Keep it hidden by default - only show when debug toggle is clicked
-    } else {
-      console.error('Debug div not found!');
-    }
-    
-    if (isStandalone || wasInstalled) {
-      console.log('Running as PWA or previously installed - hiding install banner');
-      if (UI.installBanner) {
-        UI.installBanner.classList.add('hidden');
-        UI.installBanner.style.display = 'none'; // Force hide with CSS
-      } else {
-        console.log('ERROR: Banner element not found!');
+
+        // Sort folders: Previous first, then RecipeBox, then alphabetically
+        const sortedFolders = [...folders].sort((a, b) => {
+          if (a.isPrevious) return -1;
+          if (b.isPrevious) return 1;
+          if (a.isRecipeBox) return -1;
+          if (b.isRecipeBox) return 1;
+          return a.name.localeCompare(b.name);
+        });
+
+        for (const folder of sortedFolders) {
+          const folderDiv = document.createElement('div');
+          folderDiv.className = 'folder-item';
+          folderDiv.dataset.folderId = folder.id;
+
+          // Auto-select the determined folder
+          const shouldAutoSelect = folderToAutoSelect && folder.id === folderToAutoSelect.id;
+          if (shouldAutoSelect) {
+            folderDiv.classList.add('selected');
+            selectedFolderId = folder.id;
+            UI.selectFolderBtn.disabled = false;
+            UI.shareForm.classList.remove('hidden');
+          }
+
+          // Determine the label and badges
+          let label = folder.name;
+          let badges = [];
+
+          // Ownership/sharing badges
+          if (folder.isOwned) {
+            badges.push('<span class="folder-badge owned">Owned</span>');
+          }
+          if (folder.isShared) {
+            badges.push('<span class="folder-badge shared">Shared</span>');
+          }
+
+          // Special status badges
+          if (folder.isPrevious && folder.isRecipeBox) {
+            label += ' (Current)';
+            badges.push('<span class="folder-badge" style="background: #17a2b8;">Current</span>');
+          } else if (folder.isPrevious) {
+            label += ' (Previously Selected)';
+            badges.push('<span class="folder-badge" style="background: #17a2b8;">Previous</span>');
+          } else if (folder.isRecipeBox) {
+            label += ' (Recommended)';
+            badges.push('<span class="folder-badge" style="background: #28a745;">Recommended</span>');
+          }
+
+          folderDiv.innerHTML = `
+            <div class="folder-info">
+              <strong>${label}</strong>
+              <div class="folder-badges">
+                ${badges.filter(badge => badge).join('')}
+              </div>
+            </div>
+          `;
+
+          folderDiv.addEventListener('click', () => selectFolder(folder.id, folderDiv));
+          UI.folderList.appendChild(folderDiv);
+        }
+
+        // If we auto-selected a folder, log it
+        if (folderToAutoSelect) {
+          console.log('Auto-selected folder:', folderToAutoSelect.name, folderToAutoSelect.id);
+        }
+      } catch (error) {
+        UI.folderList.innerHTML = `<div style="color: red;">Error loading folders: ${error.message}</div>`;
       }
-    } else {
-      console.log('Running in browser - install banner may be shown');
     }
-  }
-  
-  // Only check after DOM is loaded to ensure elements exist
-  document.addEventListener('DOMContentLoaded', checkAndHideBanner);
-  
-  // Also check when page is fully loaded
-  window.addEventListener('load', checkAndHideBanner);
-  
-  UI.installBtn.addEventListener('click', async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to install prompt: ${outcome}`);
-    deferredPrompt = null;
-    UI.installBanner.classList.add('hidden');
-  });
-  
-  // Hide banner if already installed
-  window.addEventListener('appinstalled', async () => {
-    console.log('Recipe Box app installed');
-    UI.installBanner.classList.add('hidden');
-    // Remember that the app was installed
-    await set(STORAGE_KEYS.APP_INSTALLED, true);
-  });
+
+    function selectFolder(folderId, folderElement) {
+      // Clear previous selection
+      document.querySelectorAll('.folder-item').forEach(item => {
+        item.classList.remove('selected');
+      });
+
+      // Select new folder
+      folderElement.classList.add('selected');
+      selectedFolderId = folderId;
+
+      // Enable the select button
+      UI.selectFolderBtn.disabled = false;
+
+      // Show share form
+      UI.shareForm.classList.remove('hidden');
+    }
+
+    async function createNewFolder() {
+      const folderName = prompt('Enter folder name:', DEFAULT_RECIPE_FOLDER_NAME);
+      if (!folderName) return;
+
+      try {
+        UI.createFolderBtn.disabled = true;
+        UI.createFolderBtn.textContent = 'Creating...';
+
+        const folderId = await syncManager.provider.createRecipeFolder(folderName);
+
+        // Refresh folder list and select the new folder
+        await loadAvailableFolders();
+
+        // Find and select the newly created folder
+        const folderElements = document.querySelectorAll('.folder-item');
+        for (const element of folderElements) {
+          if (element.dataset.folderId === folderId) {
+            selectFolder(folderId, element);
+            break;
+          }
+        }
+
+        alert(`Folder "${folderName}" created successfully!`);
+      } catch (error) {
+        alert(`Failed to create folder: ${error.message}`);
+      } finally {
+        UI.createFolderBtn.disabled = false;
+        UI.createFolderBtn.textContent = 'Create New Folder';
+      }
+    }
+
+    async function shareSelectedFolder() {
+      if (!selectedFolderId) {
+        alert('Please select a folder first');
+        return;
+      }
+
+      const email = UI.shareEmailInput.value.trim();
+      if (!email) {
+        alert('Please enter an email address');
+        return;
+      }
+
+      try {
+        UI.shareFolderBtn.disabled = true;
+        UI.shareFolderBtn.textContent = 'Sharing...';
+        UI.shareResult.innerHTML = '';
+
+        const result = await syncManager.provider.shareFolder(selectedFolderId, email);
+
+        if (result.success) {
+          UI.shareResult.innerHTML = '<div style="color: green;">✓ Folder shared successfully!</div>';
+          UI.shareEmailInput.value = '';
+        } else {
+          UI.shareResult.innerHTML = `<div style="color: red;">✗ Failed to share: ${result.error}</div>`;
+        }
+      } catch (error) {
+        UI.shareResult.innerHTML = `<div style="color: red;">✗ Error: ${error.message}</div>`;
+      } finally {
+        UI.shareFolderBtn.disabled = false;
+        UI.shareFolderBtn.textContent = 'Share Folder';
+      }
+    }
+
+    async function finalizeFolderSelection() {
+      if (!selectedFolderId) {
+        alert('Please select a folder first');
+        return;
+      }
+
+      try {
+        await syncManager.provider.selectFolder(selectedFolderId);
+        await hideFolderSelection();
+        await updateSyncStatus();
+
+        // Try to sync after folder selection
+        await performSync();
+      } catch (error) {
+        alert(`Error selecting folder: ${error.message}`);
+      }
+    }
+
+    // EVENT HANDLERS
+
+    // Folder selection event handlers
+    UI.refreshFoldersBtn.addEventListener('click', loadAvailableFolders);
+    UI.createFolderBtn.addEventListener('click', createNewFolder);
+    UI.selectFolderBtn.addEventListener('click', finalizeFolderSelection);
+    UI.shareFolderBtn.addEventListener('click', shareSelectedFolder);
+
+    // Sync event handlers
+    UI.syncConnectBtn.addEventListener('click', connectToSync);
+    UI.syncNowBtn.addEventListener('click', performSync);
+    UI.syncDisconnectBtn.addEventListener('click', disconnectFromSync);
+
+    // Menu dropdown handlers
+    UI.appIconRecipes.addEventListener('click', (e) => {
+      e.stopPropagation();
+      UI.settingsMenu.classList.remove('show');
+      UI.recipesMenu.classList.toggle('show');
+    });
+
+    UI.settingsMenuBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      UI.recipesMenu.classList.remove('show');
+      UI.settingsMenu.classList.toggle('show');
+    });
+
+    // Debug toggle with utility functions
+    let debugUtils = null;
+
+    UI.debugToggle.addEventListener('click', () => {
+      UI.debugInfo.style.display = UI.debugInfo.style.display === 'none' ? 'block' : 'none';
+
+      // Initialize debug utilities when debug panel is opened
+      if (UI.debugInfo.style.display === 'block' && !debugUtils) {
+        debugUtils = {
+          clearCacheAndReload: async () => {
+            try {
+              // Clear service worker caches
+              const cacheNames = await caches.keys();
+              await Promise.all(cacheNames.map(name => caches.delete(name)));
+
+              // Clear IndexedDB data
+              await clear();
+
+              // Unregister service worker
+              if ('serviceWorker' in navigator) {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations.map(reg => reg.unregister()));
+              }
+
+              // Force reload
+              window.location.reload(true);
+            } catch (err) {
+              console.error('Error clearing cache:', err);
+              window.location.reload(true);
+            }
+          }
+        };
+
+        // Make debug utilities available globally only when debug is active
+        window.debugUtils = debugUtils;
+      }
+    });
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', () => {
+      UI.recipesMenu.classList.remove('show');
+      UI.settingsMenu.classList.remove('show');
+    });
+
+    // Prevent dropdown closing when clicking inside
+    UI.recipesMenu.addEventListener('click', (e) => e.stopPropagation());
+    UI.settingsMenu.addEventListener('click', (e) => e.stopPropagation());
+
+    // INITIALIZATION
+    (async () => {
+      try {
+        // Try to restore directory handle first (modern browsers)
+        const saved = await get(STORAGE_KEYS.RECIPE_DIR_HANDLE);
+        if (saved && await verifyPermission(saved, 'read')) {
+          dirHandle = saved;
+          await renderIndex();
+          route();
+          return;
+        }
+      } catch (err) {
+        console.log('Error restoring directory handle:', err);
+      }
+
+      try {
+        // Fallback: try to restore recipe data (Android/fallback browsers)
+        const recipeData = await get(STORAGE_KEYS.RECIPE_DATA);
+        if (recipeData && recipeData.length > 0) {
+          console.log(`Restored ${recipeData.length} recipes from IndexedDB`);
+          // Create mock File objects from stored data
+          dirHandle = recipeData.map(recipe => new File([recipe.content], recipe.name, {
+            type: 'text/markdown',
+            lastModified: recipe.lastModified
+          }));
+          await renderIndex();
+          route();
+        }
+      } catch (err) {
+        console.log('Error restoring recipe data:', err);
+      }
+    })();
+
+    // Initialize sync functionality
+    (async () => {
+      try {
+        console.log('Starting sync initialization...');
+        await initializeSync();
+        console.log('Sync initialization complete');
+        // After sync is initialized, try to load synced recipes
+        await renderIndex();
+        route();
+        console.log('DebugSync should now be available');
+      } catch (error) {
+        console.error('Error during sync initialization:', error);
+      }
+    })();
+
+    // PWA AND SERVICE WORKER
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const registration = await navigator.serviceWorker.register('/forked/sw.js');
+          console.log('ServiceWorker registration successful:', registration.scope);
+
+          // Handle updates
+          registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // New service worker available
+                console.log('New content available; refresh to update.');
+              }
+            });
+          });
+        } catch (err) {
+          console.log('ServiceWorker registration failed:', err);
+        }
+      });
+    }
+
+    // PWA Install prompt
+    let deferredPrompt;
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredPrompt = e;
+      // Only show banner if not already running as installed PWA
+      if (!isRunningStandalone()) {
+        UI.installBanner.classList.remove('hidden');
+      }
+    });
+
+    // Check if app is running in standalone mode (installed PWA)
+    function isRunningStandalone() {
+      const standalone = window.matchMedia('(display-mode: standalone)').matches ||
+                        window.navigator.standalone === true ||
+                        document.referrer.includes('android-app://') ||
+                        window.matchMedia('(display-mode: fullscreen)').matches ||
+                        window.matchMedia('(display-mode: minimal-ui)').matches;
+
+      console.log('PWA Standalone Detection:', {
+        'display-mode: standalone': window.matchMedia('(display-mode: standalone)').matches,
+        'navigator.standalone': window.navigator.standalone,
+        'referrer': document.referrer,
+        'display-mode: fullscreen': window.matchMedia('(display-mode: fullscreen)').matches,
+        'display-mode: minimal-ui': window.matchMedia('(display-mode: minimal-ui)').matches,
+        'final result': standalone
+      });
+
+      return standalone;
+    }
+
+    // Hide banner if already running as PWA
+    async function checkAndHideBanner() {
+      // Check if previously installed
+      const wasInstalled = await get(STORAGE_KEYS.APP_INSTALLED);
+      const isStandalone = isRunningStandalone();
+
+      // Prepare debug info for when debug toggle is clicked
+      if (UI.debugInfo) {
+        UI.debugInfo.innerHTML = `
+          <strong>PWA Debug Info:</strong><br>
+          Version: <span id="debug-version">Loading...</span><br>
+          Current URL: ${window.location.href}<br>
+          Standalone: ${isStandalone}<br>
+          Was Installed: ${wasInstalled}<br>
+          Display Mode: ${window.matchMedia('(display-mode: standalone)').matches ? 'standalone' : 'browser'}<br>
+          Navigator Standalone: ${window.navigator.standalone}<br>
+          Referrer: ${document.referrer}<br>
+          User Agent: ${navigator.userAgent.substring(0, 50)}...<br>
+          <button onclick="window.debugUtils?.clearCacheAndReload()" style="margin-top:5px;padding:2px 5px;">Clear Cache & Reload</button>
+        `;
+
+        // Get version from service worker cache asynchronously
+        (async () => {
+          try {
+            let version = 'Unknown';
+            if ('caches' in window) {
+              const cacheNames = await caches.keys();
+              const recipeCache = cacheNames.find(name => name.startsWith('recipe-app-v'));
+              if (recipeCache) {
+                version = recipeCache.replace('recipe-app-v', '');
+              }
+            }
+            // Update the version in the debug panel
+            const versionSpan = document.getElementById('debug-version');
+            if (versionSpan) {
+              versionSpan.textContent = version;
+            }
+          } catch (err) {
+            console.log('Could not get version from cache:', err);
+            const versionSpan = document.getElementById('debug-version');
+            if (versionSpan) {
+              versionSpan.textContent = 'Error';
+            }
+          }
+        })();
+
+        // Keep it hidden by default - only show when debug toggle is clicked
+      } else {
+        console.error('Debug div not found!');
+      }
+
+      if (isStandalone || wasInstalled) {
+        console.log('Running as PWA or previously installed - hiding install banner');
+        if (UI.installBanner) {
+          UI.installBanner.classList.add('hidden');
+          UI.installBanner.style.display = 'none'; // Force hide with CSS
+        } else {
+          console.log('ERROR: Banner element not found!');
+        }
+      } else {
+        console.log('Running in browser - install banner may be shown');
+      }
+    }
+
+    // Only check after DOM is loaded to ensure elements exist
+    document.addEventListener('DOMContentLoaded', checkAndHideBanner);
+
+    // Also check when page is fully loaded
+    window.addEventListener('load', checkAndHideBanner);
+
+    UI.installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to install prompt: ${outcome}`);
+      deferredPrompt = null;
+      UI.installBanner.classList.add('hidden');
+    });
+
+    // Hide banner if already installed
+    window.addEventListener('appinstalled', async () => {
+      console.log('Recipe Box app installed');
+      UI.installBanner.classList.add('hidden');
+      // Remember that the app was installed
+      await set(STORAGE_KEYS.APP_INSTALLED, true);
+    });
 
 </script>
 </body>
